@@ -25,6 +25,8 @@ if (-not (Test-Path $pythonPath)) {
 if ($LASTEXITCODE -ne 0) { throw "The backend virtual environment must use Python 3.11 or newer." }
 & $pythonPath -m pip install -r (Join-Path $backendPath "requirements.txt")
 if ($LASTEXITCODE -ne 0) { throw "Backend dependency installation failed." }
+& $pythonPath -m playwright install chromium
+if ($LASTEXITCODE -ne 0) { throw "Chromium for portal automation could not be installed." }
 
 if (-not (Test-Path (Join-Path $backendPath ".env"))) {
     Copy-Item -LiteralPath (Join-Path $backendPath ".env.example") -Destination (Join-Path $backendPath ".env")

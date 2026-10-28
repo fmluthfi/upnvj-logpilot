@@ -17,7 +17,7 @@ Clone repository, lalu jalankan PowerShell dari folder proyek:
     cd upnvj-logpilot
     .\scripts\setup.ps1
 
-Setup membuat virtual environment Python, memasang kebutuhan backend dan frontend, menyalin `backend/.env.example` menjadi `backend/.env` jika belum ada, membuat database lokal, dan menjalankan migrasi SQLite. Setup tidak mengubah file sumber logbook.
+Setup membuat virtual environment Python, memasang kebutuhan backend dan frontend, memasang Chromium untuk Playwright, menyalin `backend/.env.example` menjadi `backend/.env` jika belum ada, membuat database lokal, dan menjalankan migrasi SQLite. Setup tidak mengubah file sumber logbook.
 
 Setelah setup selesai, jalankan:
 
@@ -56,7 +56,7 @@ GroqCloud membantu membuat draf hasil harian dari uraian kegiatan dan refleksi m
 2. Pilih rentang tanggal dan periksa Google Docs. Tombol **Buat dengan AI** merumuskan hasil yang tersirat langsung dari uraian kegiatan tanpa menambah capaian baru. Draf belum tersimpan sampai kamu memilih **Simpan perubahan**.
 3. Logpilot menyamarkan email, nomor telepon, serta nomor berlabel NIM/NPM/NIK/KTP sebelum mengirim teks. Tautan dokumentasi dan rincian izin tidak dikirim. Tinjau informasi sensitif lain sebelum membuat draf.
 4. Editor refleksi selalu menampilkan satu minggu kerja Senin sampai Jumat, terlepas dari rentang upload yang dipilih. Pilih **Buat draf dengan GroqCloud** untuk membuat atau membuat ulang refleksi. Hari yang belum memiliki entri ditandai agar kamu periksa sebelum menyetujui draf.
-5. Tinjau dan sunting draf, lalu simpan serta setujui setelah isinya benar. Persetujuan menyimpan status refleksi di dashboard. Logpilot tidak mengisi atau mengirim refleksi mingguan ke website.
+5. Tinjau dan sunting draf, lalu simpan serta setujui setelah isinya benar. Saat entri Jumat yang disetujui diotomasi, refleksi tersebut ikut diisi pada entri harian Jumat. Tahap penyelesaian logbook tetap manual.
 
 API key hanya dibaca backend dari `backend/.env`. Jangan menaruh key di kode frontend, file README, screenshot, atau commit Git. Tanpa key yang valid, penggunaan AI menampilkan pesan yang dapat ditindaklanjuti; fitur dashboard lain tetap bisa digunakan.
 
@@ -166,6 +166,13 @@ Migrasi bisa dijalankan ulang dengan:
 - Dashboard membaca Google Docs dan hanya menyimpan catatan dalam rentang yang dipilih. Dashboard menunjukkan tanggal yang terisi, kosong, izin/sakit, perlu ditinjau, atau tidak tercantum. Status tidak tercantum perlu dicocokkan dengan jadwal magang karena belum tentu hari kerja.
 - Entri dalam rentang pilihan dapat disunting dan disetujui satu per satu. Jam memakai format 24 jam `HH:MM`. Jam dan tautan dokumentasi dapat disimpan sebagai pengaturan bawaan; penerapan ke catatan kosong memerlukan konfirmasi, sedangkan tautan manual per entri tetap dipertahankan.
 - Refleksi Jumat menggunakan data Senin–Jumat, menandai hari tanpa catatan, dan tetap berupa draf sampai diedit serta disetujui pengguna. Teks sensitif umum disamarkan sebelum dikirim ke GroqCloud.
-- Impor CSV/PDF dan pengiriman entri ke portal belum tersedia. Otomasi tidak akan pernah menekan tombol “Selesaikan Logbook Magang”.
+- Setelah catatan harian disunting dan disetujui, panel **Isi logbook di portal** menampilkan pratinjau tanggal yang siap. Automation hanya mengisi dan menyimpan entri yang kamu setujui untuk rentang tersebut.
+- Saat dimulai, jendela Chromium terbuka untuk login manual. Jika hasil Simpan belum pasti, automation berhenti dan meminta kamu memeriksa tanggal di portal sebelum memilih apakah entri tersimpan atau belum.
+- Entri yang sudah ada tidak dikirim ulang. Kegagalan sebelum klik Simpan dapat dicoba lagi setelah ditinjau; hasil Simpan yang ambigu tidak pernah dicoba ulang otomatis.
+- Impor PDF/CSV belum tersedia. Logpilot tidak akan menekan tombol “Selesaikan Logbook Magang”; finalisasi tetap dilakukan manual oleh pengguna.
+
+### Browser untuk automation portal
+
+Setup memasang Chromium melalui Playwright. Profil login tersimpan secara lokal di `backend/.browser-profile/` agar sesi portal tetap tersedia di antara penggunaan. Folder ini diabaikan Git. Tutup aplikasi sebelum menghapus profil jika ingin mengakhiri sesi tersimpan.
 
 DaisyUI digunakan untuk komponen antarmuka; lihat [komponen DaisyUI](https://daisyui.com/components/) dan [panduan Next.js](https://daisyui.com/docs/install/nextjs/).

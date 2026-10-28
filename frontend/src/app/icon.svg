@@ -1,4 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <rect width="32" height="32" rx="9" fill="#126b57" />
-  <text x="16" y="21" fill="#f3fff8" font-family="Arial, sans-serif" font-size="13" font-weight="700" text-anchor="middle">LP</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40">
+  <rect width="40" height="40" rx="12" fill="#fffefb" />
+  <path d="M7.5 9.25c5.2-.55 9.3.65 12.5 3.45v19c-3.2-2.8-7.3-4-12.5-3.45zM32.5 9.25c-5.2-.55-9.3.65-12.5 3.45v19c3.2-2.8 7.3-4 12.5-3.45z" fill="none" stroke="#126b57" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4" />
+  <path d="M23.8 18h5.4M23.8 22h5.4M23.8 26h3.8" fill="none" stroke="#126b57" stroke-linecap="round" stroke-width="1.8" />
+  <circle cx="20" cy="19.5" r="3" fill="#d77a38" stroke="#fffefb" stroke-width="1.4" />
 </svg>

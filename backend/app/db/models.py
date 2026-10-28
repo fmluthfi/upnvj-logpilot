@@ -1,7 +1,7 @@
 from datetime import date as PyDate, datetime, time as PyTime, timezone
 from uuid import uuid4
 
-from sqlalchemy import Boolean, Date, DateTime, Integer, String, Text, Time, func
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Text, Time, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -63,6 +63,59 @@ class WeeklyReflection(Base):
     source_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
     reflection_text: Mapped[str | None] = mapped_column(Text)
     approved: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        server_default=func.current_timestamp(),
+        nullable=False,
+    )
+
+
+class AutomationRun(Base):
+    __tablename__ = "automation_runs"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    start_date: Mapped[PyDate] = mapped_column(Date, nullable=False)
+    end_date: Mapped[PyDate] = mapped_column(Date, nullable=False)
+    status: Mapped[str] = mapped_column(String(24), default="queued", index=True, nullable=False)
+    total_entries: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    completed_entries: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    stop_requested: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    last_error: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        server_default=func.current_timestamp(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        server_default=func.current_timestamp(),
+        nullable=False,
+    )
+
+
+class AutomationRunEntry(Base):
+    __tablename__ = "automation_run_entries"
+    __table_args__ = (UniqueConstraint("run_id", "entry_id", name="uq_automation_run_entry"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    run_id: Mapped[str] = mapped_column(ForeignKey("automation_runs.id", ondelete="CASCADE"), nullable=False)
+    entry_id: Mapped[str] = mapped_column(ForeignKey("logbook_entries.id", ondelete="RESTRICT"), nullable=False)
+    status: Mapped[str] = mapped_column(String(24), default="queued", nullable=False)
+    save_attempted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    safe_to_retry: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    retry_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    last_error: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        server_default=func.current_timestamp(),
+        nullable=False,
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),

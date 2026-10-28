@@ -138,14 +138,14 @@ export function EntryDefaultHours({ range, eligibleCount, documentationEligibleC
   }
 
   return (
-    <details className="collapse collapse-arrow border-y border-base-300">
-      <summary className="collapse-title min-h-0 px-0 font-semibold">Jam kerja dan dokumentasi bawaan</summary>
-      <div className="collapse-content px-0">
-        <p className="mb-4 max-w-2xl text-sm leading-6 text-base-content/70">
+    <details className="collapse collapse-arrow rounded-box border border-base-300 bg-base-100">
+      <summary className="collapse-title min-h-0 px-4 py-4 font-semibold sm:px-5">Jam kerja dan dokumentasi bawaan</summary>
+      <div className="collapse-content px-4 pb-5 sm:px-5">
+        <p className="mb-5 max-w-2xl text-sm leading-6 text-base-content/70">
           Atur jam kerja dan tautan dokumentasi yang bisa dipakai bersama. Setiap entri tetap dapat diubah secara manual.
         </p>
         <form onSubmit={save}>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid max-w-4xl gap-x-5 gap-y-4 sm:grid-cols-2">
             <label className="form-control w-full">
               <span className="label py-1"><span className="label-text text-xs">Mulai</span></span>
               <input className="input input-bordered input-sm w-full bg-base-100" type="text" inputMode="text" placeholder="09:00" maxLength={5} value={startTime} disabled={loading} onChange={(event) => { setStartTime(event.target.value); setError(""); setConfirming(null); }} />
@@ -160,24 +160,28 @@ export function EntryDefaultHours({ range, eligibleCount, documentationEligibleC
               <span className="label py-1"><span className="label-text-alt">Tautan ini mengisi entri baru dan entri kosong yang kamu pilih. Tautan manual tetap dipertahankan.</span></span>
             </label>
           </div>
-          <p className="mt-2 text-xs leading-5 text-base-content/65">Jam menggunakan format 24 jam HH:MM, misalnya 09:00.</p>
-          <button type="submit" className="btn btn-outline btn-sm mt-4" disabled={loading || saving || !settingsDirty}>
-            {saving ? "Menyimpan…" : "Simpan pengaturan bawaan"}
-          </button>
+          <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-3">
+            <p className="text-xs leading-5 text-base-content/65">Format jam 24 jam: HH:MM.</p>
+            <button type="submit" className="btn btn-outline btn-sm" disabled={loading || saving || !settingsDirty}>
+              {saving ? "Menyimpan…" : "Simpan pengaturan"}
+            </button>
+          </div>
         </form>
 
-        {hoursDirty && eligibleCount > 0 && <p className="mt-3 text-xs text-base-content/65">Simpan perubahan jam sebelum menerapkannya.</p>}
-        {!hoursDirty && settings.default_start_time && settings.default_end_time && eligibleCount > 0 && !confirming && (
-          <button type="button" className="btn btn-ghost btn-sm mt-3" onClick={() => { setConfirming("hours"); setError(""); setMessage(""); }}>
-            Tinjau penerapan ke {eligibleCount} entri
-          </button>
-        )}
-        {documentationDirty && documentationEligibleCount > 0 && <p className="mt-3 text-xs text-base-content/65">Simpan perubahan tautan sebelum menerapkannya.</p>}
-        {!documentationDirty && settings.default_documentation_url && documentationEligibleCount > 0 && !confirming && (
-          <button type="button" className="btn btn-ghost btn-sm mt-3" onClick={() => { setConfirming("documentation"); setError(""); setMessage(""); }}>
-            Tinjau dokumentasi untuk {documentationEligibleCount} entri
-          </button>
-        )}
+        <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2">
+          {hoursDirty && eligibleCount > 0 && <p className="text-xs text-base-content/65">Simpan perubahan jam sebelum menerapkannya.</p>}
+          {!hoursDirty && settings.default_start_time && settings.default_end_time && eligibleCount > 0 && !confirming && (
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setConfirming("hours"); setError(""); setMessage(""); }}>
+              Tinjau jam untuk {eligibleCount} entri
+            </button>
+          )}
+          {documentationDirty && documentationEligibleCount > 0 && <p className="text-xs text-base-content/65">Simpan perubahan tautan sebelum menerapkannya.</p>}
+          {!documentationDirty && settings.default_documentation_url && documentationEligibleCount > 0 && !confirming && (
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setConfirming("documentation"); setError(""); setMessage(""); }}>
+              Tinjau tautan untuk {documentationEligibleCount} entri
+            </button>
+          )}
+        </div>
 
         {confirming && (
           <div className="alert alert-warning mt-4 items-start">

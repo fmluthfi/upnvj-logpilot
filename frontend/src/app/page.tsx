@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { API_BASE } from "../lib/api";
 import { EntryPreview } from "../components/entry-preview";
 import { WeeklyReflectionEditor } from "../components/weekly-reflection-editor";
+import { PortalAutomation } from "../components/portal-automation";
 
 type DocsStatus = {
   configured: boolean;
@@ -90,6 +91,7 @@ export default function Home() {
   const [syncError, setSyncError] = useState("");
   const [syncing, setSyncing] = useState(false);
   const [entriesRefreshKey, setEntriesRefreshKey] = useState(0);
+  const refreshEntries = useCallback(() => setEntriesRefreshKey((current) => current + 1), []);
 
   useEffect(() => {
     let active = true;
@@ -467,6 +469,11 @@ export default function Home() {
               key={`${selectedRange.start}|${selectedRange.end}`}
               range={{ start: selectedRange.start, end: selectedRange.end }}
               refreshKey={entriesRefreshKey}
+            />
+            <PortalAutomation
+              key={`${selectedRange.start}|${selectedRange.end}`}
+              range={{ start: selectedRange.start, end: selectedRange.end }}
+              onRefresh={refreshEntries}
             />
           </>
         )}
