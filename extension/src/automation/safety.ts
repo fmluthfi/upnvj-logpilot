@@ -1,6 +1,6 @@
 namespace LogpilotSafety {
   export const DAILY_SAVE_SELECTOR = "#lbhRail #lbhBtnSave";
-  const ALLOWED_ACTIONS = new Set(["save-daily-entry"]);
+  const ALLOWED_ACTIONS = new Set(["save-daily-entry", "update-daily-entry"]);
   const FINALIZATION = /selesaikan|finalisasi|finalize|finalise|complete/i;
 
   export function assertDailySaveTarget(
@@ -17,6 +17,8 @@ namespace LogpilotSafety {
     if (matchingControls !== 1 || panel.querySelectorAll("#lbhBtnSave").length !== 1) {
       throw new Error("Tombol Simpan harian harus teridentifikasi tepat satu kali.");
     }
+    const revisionForm = (panel.textContent ?? "").includes("Revisi Entri");
+    if ((action === "update-daily-entry") !== revisionForm) throw new Error("Mode form tidak cocok dengan aksi Simpan harian.");
 
     const control = button as HTMLButtonElement;
     const labelledBy = (control.getAttribute("aria-labelledby") ?? "").split(/\s+/).filter(Boolean)

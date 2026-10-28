@@ -206,7 +206,7 @@ def _week_snapshot(session: Session, friday: date) -> WeekSnapshot:
             hash_rows.append({
                 "date": day.isoformat(),
                 "source_hash": entry.source_hash,
-                "status": entry.status,
+                "status": "approved" if entry.entry_approved and entry.status in {"processing", "submitted", "verification_needed"} else entry.status,
                 "source_conflict": entry.source_conflict,
                 **facts,
             })

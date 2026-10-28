@@ -159,14 +159,15 @@ function renderRun(status: PopupExtensionStatus) {
   runStatus.textContent = labels[run.status] ?? "Perlu diperiksa";
   runStatus.className = `status-badge ${["running", "completed"].includes(run.status) ? "is-good" : ["ready", "paused", "stopping"].includes(run.status) ? "is-warning" : ""}`;
   runRange.textContent = `${formatDate(run.start_date)} — ${formatDate(run.end_date)}`;
-  const submitted = run.counts.submitted ?? run.completed_entries;
+  const submitted = run.completed_entries;
+  const updated = run.counts.updated ?? 0;
   const queued = run.counts.queued ?? 0;
   const processing = run.counts.processing ?? 0;
   const failed = run.counts.failed ?? 0;
   const skipped = run.counts.skipped ?? 0;
   const review = run.counts.verification_needed ?? 0;
   runProgress.value = run.total_entries ? Math.round((submitted / run.total_entries) * 100) : 0;
-  runSummary.textContent = `${submitted} dari ${run.total_entries} tersimpan · ${queued + processing} menunggu · ${failed} gagal · ${skipped} dilewati`;
+  runSummary.textContent = `${submitted} dari ${run.total_entries} tersimpan${updated ? ` · ${updated} diperbarui` : ""} · ${queued + processing} menunggu · ${failed} gagal · ${skipped} dilewati`;
   runCurrent.hidden = !(status.current_date || status.step || review);
   runCurrent.textContent = review
     ? "Ada upaya Simpan yang perlu diperiksa di portal sebelum batch dilanjutkan."

@@ -26,10 +26,13 @@ type Run = {
   total_entries: number;
   completed_entries: number;
   counts: Record<string, number>;
+  entries?: { id: string; status: string; save_attempted: boolean }[];
   last_error?: string | null;
 };
 
 const prepareStorage = () => chrome.storage.local.setAccessLevel({ accessLevel: "TRUSTED_CONTEXTS" });
+let recoveryInFlight: Promise<void> | null = null;
+let portalVerification: { key: string; promise: Promise<boolean> } | null = null;
 chrome.runtime.onInstalled.addListener(() => {
   void prepareStorage().catch(() => {});
   chrome.alarms.create(ALARM_NAME, { periodInMinutes: 1 });
@@ -158,6 +161,7 @@ async function getStatus() {
   if (!token) return { backend: "connected", paired: false, portal: portal.status, run: null, current_date: portal.currentDate, step: (await readState()).step };
   try {
     await LogpilotApi.request("/extension/status", {}, token);
+    await recoverRunner().catch(() => {});
     const run = await LogpilotApi.request<Run | null>("/extension/jobs/latest", {}, token);
     const state = await readState();
     return { backend: "connected", paired: true, portal: portal.status, run, current_date: state.active?.entry.date ?? portal.currentDate, step: state.step };
@@ -249,31 +253,89 @@ async function retryFailed() {
   return claimAndDispatch(portal.tab.id, token);
 }
 
-async function recordResult(state: RunnerState, outcome: string, error: string | undefined, token: string) {
+async function recordResult(state: RunnerState, outcome: string, error: string | undefined, token: string, portalVerified = false) {
   const claim = state.active;
   if (!claim) throw new Error("Tidak ada entri aktif untuk dilaporkan.");
-  const allowed = ["success", "failed", "skipped", "unknown", "already_present", "paused", "stopped"];
+  const allowed = ["success", "updated", "failed", "skipped", "unknown", "already_present", "paused", "stopped"];
   if (!allowed.includes(outcome)) throw new Error("Hasil entri tidak dikenali.");
-  const run = await LogpilotApi.request<Run>(
+  const currentWorker = await workerId();
+  const report = (confirmed = portalVerified, reportedOutcome = outcome) => LogpilotApi.request<Run>(
     `/extension/jobs/${encodeURIComponent(claim.run_id)}/entries/${encodeURIComponent(claim.run_entry_id)}/report`,
-    { method: "POST", body: JSON.stringify({ worker_id: await workerId(), outcome, error: error?.slice(0, 1000) }) }, token,
+    { method: "POST", body: JSON.stringify({
+      worker_id: currentWorker,
+      outcome: reportedOutcome,
+      error: error?.slice(0, 1000),
+      portal_verified: confirmed,
+    }) }, token,
   );
-  const autoContinue = ["success", "already_present", "failed", "skipped"].includes(outcome) && run.status === "ready";
+  let completedOutcome = outcome;
+  let run: Run;
+  try {
+    run = await report();
+  } catch (reportError) {
+    const latest = await LogpilotApi.request<Run>(`/extension/jobs/${encodeURIComponent(claim.run_id)}`, {}, token).catch(() => null);
+    const recovered = latest && await confirmSavedResult(state, latest, token, outcome, error);
+    if (!recovered) throw reportError;
+    run = recovered;
+    completedOutcome = outcome === "updated" ? "updated" : "success";
+  }
+  if (run.entries?.some((item) => item.id === claim.run_entry_id && item.status === "verification_needed" && item.save_attempted)) {
+    const recovered = await confirmSavedResult(state, run, token, outcome, error);
+    if (recovered) {
+      run = recovered;
+      completedOutcome = outcome === "updated" ? "updated" : "success";
+    }
+  }
+  const needsPortalReview = run.entries?.some((item) => item.status === "verification_needed" && item.save_attempted);
+  const autoContinue = needsPortalReview
+    || (["success", "updated", "already_present", "failed", "skipped"].includes(completedOutcome) && run.status === "ready");
   await writeState({ worker_id: await workerId(), auto_continue: autoContinue });
-  if (autoContinue) {
+  if (run.status === "ready" && autoContinue) {
     const portal = await inspectPortal();
     if (portal.status === "ready" && portal.tab?.id) return claimAndDispatch(portal.tab.id, token);
   }
   return run;
 }
 
+async function confirmSavedResult(state: RunnerState, run: Run, token: string, outcome: string, error?: string) {
+  const claim = state.active;
+  const item = claim && run.entries?.find((entry) => entry.id === claim.run_entry_id);
+  if (!claim || !item || item.status !== "verification_needed" || !item.save_attempted) return null;
+  const portal = await inspectPortal();
+  const tabId = portal.status === "ready" ? portal.tab?.id : undefined;
+  if (!tabId) return null;
+  if (!await verifyPortalSaved(tabId, claim.entry)) return null;
+  return LogpilotApi.request<Run>(
+    `/extension/jobs/${encodeURIComponent(claim.run_id)}/entries/${encodeURIComponent(claim.run_entry_id)}/report`,
+    { method: "POST", body: JSON.stringify({
+      worker_id: await workerId(),
+      outcome: outcome === "updated" ? "updated" : "success",
+      error: error?.slice(0, 1000),
+      portal_verified: true,
+    }) }, token,
+  );
+}
+
 async function recoverRunner() {
+  if (recoveryInFlight) return recoveryInFlight;
+  recoveryInFlight = recoverRunnerNow().finally(() => { recoveryInFlight = null; });
+  return recoveryInFlight;
+}
+
+async function recoverRunnerNow() {
   const token = await readToken();
   if (!token) return;
   let state = await readState();
+  let run: Run | null = null;
   if (!state.active) {
-    const run = await LogpilotApi.request<Run | null>("/extension/jobs/latest", {}, token);
-    if (!run || (run.status !== "running" && !(run.status === "ready" && state.auto_continue))) return;
+    run = await LogpilotApi.request<Run | null>("/extension/jobs/latest", {}, token);
+    if (!run) return;
+    if (run.status === "paused") {
+      const uncertain = run.entries?.find((item) => item.status === "verification_needed" && item.save_attempted);
+      if (uncertain && await recoverSavedEntry(run.id, uncertain.id, token)) return;
+      return;
+    }
+    if (run.status !== "running" && !(run.status === "ready" && state.auto_continue)) return;
     state = { worker_id: await workerId() };
   }
   const worker = await workerId();
@@ -282,18 +344,26 @@ async function recoverRunner() {
       method: "POST", body: JSON.stringify({ worker_id: worker }),
     }, token);
     if (!claim) {
-      await writeState({ worker_id: worker });
+      run = await LogpilotApi.request<Run>(`/extension/jobs/${encodeURIComponent(state.active?.run_id ?? run?.id ?? "")}`, {}, token).catch(() => null);
+      const activeId = state.active?.run_entry_id;
+      const uncertain = run?.entries?.find((item) => item.id === activeId && item.status === "verification_needed" && item.save_attempted);
+      if (run && uncertain && await recoverSavedEntry(run.id, uncertain.id, token)) return;
+      await writeState({ worker_id: worker, auto_continue: Boolean(uncertain) });
       return;
     }
     state.active = claim;
     state.save_attempted = claim.save_attempted;
-    await writeState(state);
-    if (claim.save_attempted) return;
     const tabs = await portalTabs();
     const tab = tabs.find((candidate) => candidate.id === state.tab_id) ?? tabs[0];
     if (!tab?.id) return;
     state.tab_id = tab.id;
     await writeState(state);
+    if (claim.save_attempted) {
+      if (await verifyPortalSaved(tab.id, claim.entry)) {
+        await recordResult(state, "success", undefined, token, true);
+      }
+      return;
+    }
     await LogpilotApi.request<{ pause_requested: boolean; stop_requested: boolean }>(
       `/extension/jobs/${encodeURIComponent(claim.run_id)}/entries/${encodeURIComponent(claim.run_entry_id)}/heartbeat`,
       { method: "POST", body: JSON.stringify({ worker_id: worker }) }, token,
@@ -308,6 +378,29 @@ async function recoverRunner() {
   } catch {
     return;
   }
+}
+
+async function recoverSavedEntry(runId: string, runEntryId: string, token: string) {
+  const portal = await inspectPortal();
+  const tabId = portal.status === "ready" ? portal.tab?.id : undefined;
+  if (!tabId) return false;
+  const claim = await LogpilotApi.request<Claim>(
+    `/extension/jobs/${encodeURIComponent(runId)}/entries/${encodeURIComponent(runEntryId)}`, {}, token,
+  );
+  if (!await verifyPortalSaved(tabId, claim.entry)) return false;
+  await recordResult({ worker_id: await workerId(), active: claim, tab_id: tabId, save_attempted: true }, "success", undefined, token, true);
+  return true;
+}
+
+async function verifyPortalSaved(tabId: number, entry: Claim["entry"]) {
+  const key = `${tabId}:${entry.date}`;
+  if (portalVerification) return portalVerification.key === key ? portalVerification.promise : false;
+  const promise = chrome.tabs.sendMessage(tabId, { type: "VERIFY_SAVED", entry })
+    .then((result) => (result as { saved?: boolean })?.saved === true)
+    .catch(() => false);
+  portalVerification = { key, promise };
+  void promise.then(() => { if (portalVerification?.promise === promise) portalVerification = null; });
+  return promise;
 }
 
 async function portalTabClosed(tabId: number) {

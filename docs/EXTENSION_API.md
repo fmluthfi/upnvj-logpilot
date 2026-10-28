@@ -18,7 +18,7 @@ CORS membatasi origin dashboard, tetapi bukan autentikasi. Endpoint extension te
 
 `GET /api/extension/jobs/latest` membaca batch extension terbaru. `POST /api/extension/jobs/claim` memerlukan bearer token dan `{ "worker_id": "..." }`. Satu extension memegang paling banyak satu entri aktif. Respons berisi `run_id`, `run_entry_id`, `entry_id`, `save_attempted`, `lease_expires_at`, dan snapshot `entry`; respons `null` berarti belum ada entri yang dapat diklaim. Klaim aktif dari worker yang sama dikembalikan lagi agar service worker bisa pulih setelah disuspensi.
 
-Lease berlaku dua menit. Kirim `POST /api/extension/jobs/{run_id}/entries/{run_entry_id}/heartbeat` secara berkala. Lease yang kedaluwarsa sebelum upaya Simpan dapat diklaim ulang. Lease yang kedaluwarsa setelah upaya Simpan mengubah entri menjadi `verification_needed` dan menghentikan batch sampai pengguna memeriksa portal.
+Lease berlaku dua menit. Kirim `POST /api/extension/jobs/{run_id}/entries/{run_entry_id}/heartbeat` secara berkala. Lease yang kedaluwarsa sebelum upaya Simpan dapat diklaim ulang. Lease yang kedaluwarsa sesudahnya mengubah entri menjadi `verification_needed`; extension lalu memeriksa portal tanpa menyimpan ulang. Hanya status `Menunggu Validasi` pada tanggal yang sama dan kecocokan seluruh field pada form revisi yang mengonfirmasi Simpan. Jika pemeriksaan itu gagal, batch tetap dijeda untuk ditinjau pengguna.
 
 ## Penyimpanan dan hasil
 
@@ -26,20 +26,21 @@ Sebelum menekan kontrol Simpan harian yang sudah diverifikasi, extension wajib m
 
 Laporkan hasil melalui `POST /api/extension/jobs/{run_id}/entries/{run_entry_id}/report`:
 
-- `success`: hanya setelah upaya Simpan tercatat, form tertutup, dan uraian muncul tepat satu kali pada panel tanggal. Ini adalah konfirmasi DOM; persistensi server belum diuji dengan entri sungguhan.
-- `already_present`: hanya bila aktivitas yang sama sudah terlihat pada tanggal tujuan sebelum pengisian; tidak menekan Simpan lagi.
-- `failed`: jika berhenti sebelum Simpan, entri aman untuk ditinjau dan dicoba ulang. Jika Simpan sudah dicatat, hasil menjadi pemeriksaan manual.
+- `success`: hanya setelah upaya Simpan tercatat dan entri portal dapat diverifikasi. Untuk pemulihan lease, extension mengirim `portal_verified: true` hanya setelah status dan semua field cocok. Tidak perlu menunggu validasi dosen.
+- `updated`: hanya setelah perbedaan entri yang sudah ada diperiksa per field, form revisi disimpan sekali, lalu semua field cocok saat form dibuka kembali.
+- `already_present`: hanya bila semua field pada entri portal cocok dengan snapshot; tidak menekan Simpan lagi.
+- `failed`: jika berhenti sebelum Simpan, entri aman untuk ditinjau dan dicoba ulang. Jika Simpan sudah dicatat, hasil diverifikasi sebelum batch dilanjutkan.
 - `skipped`: perlu ditinjau dan tidak otomatis dicoba ulang.
-- `unknown`: hasil yang tidak dapat dipastikan; setelah upaya Simpan, status wajib diperiksa manual.
-- `paused` dan `stopped`: hanya untuk checkpoint sebelum upaya Simpan. Upaya Simpan yang sudah tercatat tetap memerlukan pemeriksaan manual.
+- `unknown`: hasil yang tidak dapat dipastikan; setelah upaya Simpan, extension mencoba mencocokkan entri baca-saja sebelum meminta pemeriksaan manual.
+- `paused` dan `stopped`: hanya untuk checkpoint sebelum upaya Simpan.
 
-`GET /api/extension/jobs/{run_id}` membaca progres. `POST /api/extension/jobs/{run_id}/control` menerima `pause`, `resume`, atau `stop` dan memerlukan bearer token. `POST /api/extension/jobs/{run_id}/retry-failed` menggunakan `{ "confirmed": true }` dan hanya mengulang entri gagal yang snapshot sumbernya belum berubah. Dashboard menggunakan `POST /api/runs/{run_id}/control` dengan kontrak aksi yang sama.
+`GET /api/extension/jobs/{run_id}` membaca progres. `GET /api/extension/jobs/{run_id}/entries/{run_entry_id}` hanya mengembalikan snapshot untuk entri extension yang perlu verifikasi sesudah upaya Simpan. Hasil verifikasi dikirim lewat endpoint `report` yang sama; backend hanya menerima `portal_verified: true` untuk status `verification_needed` dan hasil sukses. Jika semua field cocok, batch melanjutkan klaim berikutnya otomatis. `POST /api/extension/jobs/{run_id}/control` menerima `pause`, `resume`, atau `stop` dan memerlukan bearer token. `POST /api/extension/jobs/{run_id}/retry-failed` menggunakan `{ "confirmed": true }` dan hanya mengulang entri gagal yang snapshot sumbernya belum berubah. Dashboard menggunakan `POST /api/runs/{run_id}/control` dengan kontrak aksi yang sama.
 
 Tidak ada endpoint atau aksi extension untuk menyelesaikan/finalisasi logbook. Kontrol Simpan hanya boleh mengirim satu entri harian.
 
 ## Siklus hidup Manifest V3
 
-Service worker menyimpan worker ID, klaim aktif, tab portal, langkah, dan penanda Simpan di `chrome.storage.local` dengan akses `TRUSTED_CONTEXTS`. Alarm satu menit menjaga lease sebelum Simpan. Jika penanda Simpan sudah ada, extension tidak mengirim ulang entri; lease yang kedaluwarsa mengharuskan pemeriksaan manual. Content script hanya berkomunikasi dengan service worker melalui pesan bertipe dan tidak menerima bearer token.
+Service worker menyimpan worker ID, klaim aktif, tab portal, langkah, dan penanda Simpan di `chrome.storage.local` dengan akses `TRUSTED_CONTEXTS`. Alarm satu menit dan pemeriksaan status popup memulihkan batch. Jika lease kedaluwarsa setelah Simpan, extension membuka form revisi untuk membaca field dan menutupnya dengan `Batal`; extension tidak menekan Simpan lagi. Batch otomatis berlanjut setelah verifikasi cocok. Content script hanya berkomunikasi dengan service worker melalui pesan bertipe dan tidak menerima bearer token.
 
 Rujukan resmi Chrome:
 

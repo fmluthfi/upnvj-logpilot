@@ -1,5 +1,6 @@
+import json
 import unittest
-from datetime import date, time
+from datetime import date, datetime, time, timezone
 from unittest.mock import patch
 
 from fastapi import HTTPException
@@ -10,13 +11,18 @@ from app.api.runs import (
     Confirmation,
     ResolveRequest,
     StartRequest,
+    latest_run,
+    prepare_run,
     resolve_entry,
     retry_failed,
     start_run,
     stop_run,
 )
+from app.automation.portal_adapter import PortalSafetyError
 from app.db.base import Base
 from app.db.models import AutomationRun, AutomationRunEntry, LogbookEntry
+from app.db.models import WeeklyReflection
+from app.services.reflection_service import get_week_reflection
 
 
 class AutomationRunApiTests(unittest.TestCase):
@@ -82,6 +88,37 @@ class AutomationRunApiTests(unittest.TestCase):
             start_run(self.payload(), self.session)
         self.assertEqual(error.exception.status_code, 409)
 
+    def test_prepare_friday_entry_keeps_approved_reflection_after_status_transition(self):
+        friday = date(2026, 10, 2)
+        entry = self.entry(date=friday)
+        reflection_snapshot = get_week_reflection(self.session, friday)
+        reflection = WeeklyReflection(
+            friday_date=friday,
+            source_hash=reflection_snapshot["source_hash"],
+            reflection_text="Refleksi yang disetujui.",
+            approved=True,
+        )
+        self.session.add(reflection)
+        self.session.commit()
+
+        result = prepare_run(StartRequest(start_date=friday, end_date=friday, confirmed=True), self.session)
+
+        item = self.session.query(AutomationRunEntry).filter_by(run_id=result["id"]).one()
+        self.assertEqual(entry.status, "processing")
+        self.assertEqual(json.loads(item.snapshot_json)["reflection_text"], "Refleksi yang disetujui.")
+
+    def test_snapshot_validation_failure_returns_conflict_without_starting_batch(self):
+        entry = self.entry()
+
+        with patch("app.api.runs._portal_fields", side_effect=PortalSafetyError("Refleksi berubah.")):
+            with self.assertRaises(HTTPException) as error:
+                prepare_run(self.payload(end_date="2026-10-01"), self.session)
+
+        self.assertEqual(error.exception.status_code, 409)
+        self.session.refresh(entry)
+        self.assertEqual(entry.status, "approved")
+        self.assertEqual(self.session.query(AutomationRun).count(), 0)
+
     def test_failed_worker_launch_returns_entries_to_approved(self):
         entry = self.entry()
 
@@ -103,6 +140,65 @@ class AutomationRunApiTests(unittest.TestCase):
         self.session.refresh(run)
         self.assertTrue(run.stop_requested)
         self.assertEqual(run.status, "stopping")
+
+    def test_latest_run_returns_extension_batch_not_legacy_playwright_run(self):
+        legacy = AutomationRun(start_date=date(2026, 10, 1), end_date=date(2026, 10, 1), status="completed", runner="playwright", created_at=datetime(2026, 10, 1, tzinfo=timezone.utc))
+        extension = AutomationRun(start_date=date(2026, 10, 2), end_date=date(2026, 10, 2), status="ready", runner="extension", created_at=datetime(2026, 10, 2, tzinfo=timezone.utc))
+        self.session.add_all([legacy, extension])
+        self.session.commit()
+
+        result = latest_run(self.session)
+
+        self.assertEqual(result["id"], extension.id)
+        self.assertEqual(result["runner"], "extension")
+
+    def test_latest_run_surfaces_active_legacy_batch_for_reconciliation(self):
+        extension = AutomationRun(start_date=date(2026, 10, 1), end_date=date(2026, 10, 1), status="ready", runner="extension", created_at=datetime(2026, 10, 1, tzinfo=timezone.utc))
+        legacy = AutomationRun(start_date=date(2026, 10, 2), end_date=date(2026, 10, 2), status="paused", runner="playwright", created_at=datetime(2026, 10, 2, tzinfo=timezone.utc))
+        self.session.add_all([extension, legacy])
+        self.session.commit()
+
+        result = latest_run(self.session)
+
+        self.assertEqual(result["id"], legacy.id)
+        self.assertEqual(result["runner"], "playwright")
+
+    def test_reconciling_legacy_paused_entry_completes_old_batch(self):
+        uncertain = self.entry(status="verification_needed")
+        fresh = self.entry(date=date(2026, 10, 5))
+        run = AutomationRun(start_date=uncertain.date, end_date=uncertain.date, status="paused", runner="playwright", total_entries=1)
+        self.session.add(run)
+        self.session.flush()
+        item = AutomationRunEntry(run_id=run.id, entry_id=uncertain.id, status="verification_needed", save_attempted=True)
+        self.session.add(item)
+        self.session.commit()
+
+        resolve_entry(run.id, item.id, ResolveRequest(portal_checked=True, outcome="saved"), self.session)
+        self.session.refresh(run)
+        self.assertEqual(run.status, "completed")
+
+        prepared = prepare_run(StartRequest(start_date=fresh.date, end_date=fresh.date, confirmed=True), self.session)
+        self.assertEqual(prepared["runner"], "extension")
+
+    def test_legacy_paused_entry_does_not_block_other_dates_or_unlock_uncertain_date(self):
+        uncertain = self.entry(status="verification_needed")
+        fresh = self.entry(date=date(2026, 10, 5))
+        run = AutomationRun(start_date=uncertain.date, end_date=uncertain.date, status="paused", runner="playwright", total_entries=1)
+        self.session.add(run)
+        self.session.flush()
+        item = AutomationRunEntry(run_id=run.id, entry_id=uncertain.id, status="verification_needed", save_attempted=True)
+        self.session.add(item)
+        self.session.commit()
+
+        with self.assertRaises(HTTPException) as error:
+            prepare_run(StartRequest(start_date=uncertain.date, end_date=uncertain.date, confirmed=True), self.session)
+        self.assertEqual(error.exception.status_code, 409)
+        self.assertIn("Tidak ada entri yang siap", error.exception.detail)
+        self.session.refresh(item)
+        self.assertEqual(item.status, "verification_needed")
+
+        prepared = prepare_run(StartRequest(start_date=fresh.date, end_date=fresh.date, confirmed=True), self.session)
+        self.assertEqual([entry["date"] for entry in prepared["entries"]], [fresh.date.isoformat()])
 
     def test_ambiguous_save_requires_portal_check_before_retry(self):
         entry = self.entry(status="verification_needed")

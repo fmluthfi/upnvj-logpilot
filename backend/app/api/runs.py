@@ -93,9 +93,13 @@ def _prepare_run(request: StartRequest, session: Session) -> dict:
     session.add(run)
     session.flush()
     for entry in entries:
+        try:
+            snapshot = _portal_fields(session, entry)
+        except PortalSafetyError as error:
+            session.rollback()
+            raise HTTPException(status_code=409, detail=str(error)) from error
         entry.status = "processing"
         entry.last_error = None
-        snapshot = _portal_fields(session, entry)
         snapshot["entry_id"] = entry.id
         session.add(AutomationRunEntry(
             run_id=run.id,
@@ -138,7 +142,13 @@ def _start_run(request: StartRequest, session: Session) -> dict:
 
 @router.get("/latest")
 def latest_run(session: Session = Depends(get_db)) -> dict | None:
-    run = session.scalar(select(AutomationRun).order_by(AutomationRun.created_at.desc(), AutomationRun.id.desc()).limit(1))
+    run = session.scalar(select(AutomationRun).where(
+        AutomationRun.status.in_(ACTIVE_STATUSES),
+    ).order_by(AutomationRun.created_at.desc(), AutomationRun.id.desc()).limit(1))
+    if run is None:
+        run = session.scalar(select(AutomationRun).where(
+            AutomationRun.runner == "extension",
+        ).order_by(AutomationRun.created_at.desc(), AutomationRun.id.desc()).limit(1))
     return _run_payload(session, run) if run else None
 
 
@@ -255,6 +265,12 @@ def resolve_entry(
         entry.last_error = item.last_error
     if run.runner == "extension":
         _refresh_extension_run(session, run)
+    else:
+        statuses = set(session.scalars(select(AutomationRunEntry.status).where(
+            AutomationRunEntry.run_id == run.id,
+        )))
+        if not statuses.intersection({"verification_needed", "queued", "processing"}):
+            run.status = "failed" if "failed" in statuses else "stopped" if "stopped" in statuses else "completed"
     session.commit()
     return _run_payload(session, run)
 
@@ -331,12 +347,15 @@ def _spawn_worker(run_id: str) -> None:
 
 
 def _require_no_active_run(session: Session, *, excluding_run_id: str | None = None) -> None:
-    query = select(AutomationRun.id).where(AutomationRun.status.in_(ACTIVE_STATUSES))
+    query = select(AutomationRun.id).where(
+        AutomationRun.status.in_(ACTIVE_STATUSES),
+        (AutomationRun.runner == "extension") | (AutomationRun.status != "paused"),
+    )
     if excluding_run_id:
         query = query.where(AutomationRun.id != excluding_run_id)
     active = session.scalar(query.limit(1))
     if active:
-        raise HTTPException(status_code=409, detail="Automation lain masih berjalan. Hentikan atau tunggu sampai selesai.")
+        raise HTTPException(status_code=409, detail="Batch sebelumnya belum selesai. Periksa status dan entri yang perlu ditinjau pada panel automation.")
 
 
 def _get_run(session: Session, run_id: str) -> AutomationRun:
@@ -369,7 +388,7 @@ def _run_payload(session: Session, run: AutomationRun | None) -> dict | None:
     items = list(session.scalars(
         select(AutomationRunEntry).where(AutomationRunEntry.run_id == run.id).order_by(AutomationRunEntry.created_at, AutomationRunEntry.id)
     ))
-    counts = {status: sum(item.status == status for item in items) for status in ("queued", "processing", "submitted", "failed", "stopped", "skipped", "verification_needed")}
+    counts = {status: sum(item.status == status for item in items) for status in ("queued", "processing", "submitted", "updated", "failed", "stopped", "skipped", "verification_needed")}
     return {
         "id": run.id,
         "start_date": run.start_date.isoformat(),
@@ -383,7 +402,7 @@ def _run_payload(session: Session, run: AutomationRun | None) -> dict | None:
         "last_error": run.last_error,
         "counts": counts,
         "entries": [
-            {"id": item.id, "date": session.get(LogbookEntry, item.entry_id).date.isoformat(), "status": item.status, "last_error": item.last_error, "safe_to_retry": item.safe_to_retry}
+            {"id": item.id, "date": session.get(LogbookEntry, item.entry_id).date.isoformat(), "status": item.status, "last_error": item.last_error, "safe_to_retry": item.safe_to_retry, "save_attempted": item.save_attempted}
             for item in items
         ],
     }

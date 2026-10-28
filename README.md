@@ -17,7 +17,7 @@ Clone repository, lalu jalankan PowerShell dari folder proyek:
     cd upnvj-logpilot
     .\scripts\setup.ps1
 
-Setup membuat virtual environment Python, memasang kebutuhan backend dan frontend, memasang Chromium untuk Playwright, menyalin `backend/.env.example` menjadi `backend/.env` jika belum ada, membuat database lokal, dan menjalankan migrasi SQLite. Backend juga memeriksa migrasi sebelum mulai agar database mengikuti versi aplikasi. Setup tidak mengubah file sumber logbook.
+Setup membuat virtual environment Python, memasang kebutuhan backend dan frontend, memasang Chromium yang masih dibutuhkan jalur Playwright lama, menyalin `backend/.env.example` menjadi `backend/.env` jika belum ada, membuat database lokal, dan menjalankan migrasi SQLite. Backend juga memeriksa migrasi sebelum mulai agar database mengikuti versi aplikasi. Setup tidak mengubah file sumber logbook.
 
 Setelah setup selesai, jalankan:
 
@@ -164,15 +164,30 @@ Migrasi bisa dijalankan ulang dengan:
 
 - Pilih tanggal mulai dan akhir sesuai periode masing-masing. Rentang bersifat inklusif; tanggal akhir harus sama dengan atau setelah tanggal mulai. Pilihan cepat tersedia untuk 3 hari dan 1 minggu.
 - Dashboard membaca Google Docs dan hanya menyimpan catatan dalam rentang yang dipilih. Dashboard menunjukkan tanggal yang terisi, kosong, izin/sakit, perlu ditinjau, atau tidak tercantum. Status tidak tercantum perlu dicocokkan dengan jadwal magang karena belum tentu hari kerja.
-- Entri dalam rentang pilihan dapat disunting dan disetujui satu per satu. Jam memakai format 24 jam `HH:MM`. Jam dan tautan dokumentasi dapat disimpan sebagai pengaturan bawaan; penerapan ke catatan kosong memerlukan konfirmasi, sedangkan tautan manual per entri tetap dipertahankan.
+- Entri dalam rentang pilihan dapat disunting dan disetujui satu per satu, termasuk entri yang sudah tersimpan di portal. Perubahan pada entri terkirim menghapus persetujuan lokal; setujui ulang sebelum menyiapkan batch revisi. Jam memakai format 24 jam `HH:MM`. Jam dan tautan dokumentasi dapat disimpan sebagai pengaturan bawaan; penerapan ke catatan kosong memerlukan konfirmasi, sedangkan tautan manual per entri tetap dipertahankan.
 - Refleksi Jumat menggunakan data Senin–Jumat, menandai hari tanpa catatan, dan tetap berupa draf sampai diedit serta disetujui pengguna. Teks sensitif umum disamarkan sebelum dikirim ke GroqCloud.
-- Setelah catatan harian disunting dan disetujui, panel **Isi logbook di portal** menampilkan pratinjau tanggal yang siap. Automation hanya mengisi dan menyimpan entri yang kamu setujui untuk rentang tersebut.
-- Saat dimulai, jendela Chromium terbuka untuk login manual. Jika hasil Simpan belum pasti, automation berhenti dan meminta kamu memeriksa tanggal di portal sebelum memilih apakah entri tersimpan atau belum.
-- Entri yang sudah ada tidak dikirim ulang. Kegagalan sebelum klik Simpan dapat dicoba lagi setelah ditinjau; hasil Simpan yang ambigu tidak pernah dicoba ulang otomatis.
+- Setelah catatan harian disunting dan disetujui, panel **Isi logbook di portal** menampilkan pratinjau tanggal yang siap. Dashboard membuat snapshot batch dari entri yang disetujui; perubahan berikutnya tidak mengubah snapshot tersebut.
+- Chrome extension memakai sesi browser yang sudah kamu buka. Mulai batch dari popup extension, lalu pantau progres dan periksa hasil yang belum pasti di dashboard. Dashboard tidak mengotomasi DOM portal.
+- Extension membandingkan field portal dengan snapshot: data yang sama dilewati tanpa Simpan, sementara perubahan disimpan melalui form revisi yang teridentifikasi. Kegagalan sebelum klik Simpan dapat dicoba lagi setelah ditinjau; hasil Simpan yang ambigu tidak pernah dicoba ulang otomatis.
+- Batch Playwright lama yang berhenti dengan hasil Simpan belum pasti tidak menghalangi tanggal lain. Entri pada tanggal yang belum diperiksa tetap terkunci sampai pengguna mencocokkannya dengan portal.
 - Impor PDF/CSV belum tersedia. Logpilot tidak akan menekan tombol “Selesaikan Logbook Magang”; finalisasi tetap dilakukan manual oleh pengguna.
 
-### Browser untuk automation portal
+### Memasang Chrome extension
 
-Setup memasang Chromium melalui Playwright. Profil login tersimpan secara lokal di `backend/.browser-profile/` agar sesi portal tetap tersedia di antara penggunaan. Folder ini diabaikan Git. Tutup aplikasi sebelum menghapus profil jika ingin mengakhiri sesi tersimpan.
+1. Jalankan `npm --prefix frontend run build:extension` dari folder proyek. Perintah ini membuat berkas JavaScript di `extension/dist/`.
+2. Buka `chrome://extensions` di Chrome, aktifkan **Developer mode**, lalu pilih **Load unpacked**.
+3. Pilih folder `extension` di repository, yaitu folder yang berisi `manifest.json`. Biarkan Chrome tetap membuka extension ini.
+4. Jalankan Logpilot dengan `.\scripts\start.ps1`, lalu buka dashboard di `http://localhost:3000`.
+5. Di panel **Isi logbook di portal**, pilih **Buat kode pairing**. Buka popup Logpilot dari ikon Extensions Chrome, tempel kode tersebut, lalu pilih **Hubungkan extension**. Kode hanya berlaku lima menit dan dapat dipakai satu kali.
+6. Buka `https://kampusberdampak.upnvj.ac.id/logbook-harian` pada Chrome yang sama dan masuk secara manual. Jangan tutup tab portal saat extension bekerja.
+7. Tinjau dan setujui entri pada dashboard, pilih **Periksa entri yang disetujui**, centang konfirmasi, lalu pilih **Siapkan batch**.
+8. Buka popup Logpilot. Pastikan backend terhubung, pairing aktif, dan panel logbook terdeteksi; pilih **Mulai automation** untuk menjalankan batch. Popup dapat ditutup setelah batch mulai.
+9. Pantau progres di popup atau dashboard. Dashboard dapat menjeda/menghentikan batch, memeriksa hasil yang belum pasti, dan menyiapkan ulang entri gagal yang aman. Jalankan batch baru atau retry dari popup extension.
+
+Jika extension baru dipasang atau diperbarui, muat ulang tab portal. Jika Chrome menampilkan error di popup, pastikan backend masih berjalan dan periksa status portal serta pairing. Untuk memasangkan ulang, putuskan extension dari popup terlebih dahulu.
+
+Extension hanya menyimpan entri harian yang disetujui. Pengujian otomatis menggunakan mock dan tidak mengirim entri sungguhan. Penyelesaian/finalisasi logbook tetap manual.
+
+> Migrasi masih bertahap: dependency dan instalasi Chromium Playwright dipertahankan sementara untuk jalur lama. Dashboard kini menyiapkan batch untuk extension; penghapusan jalur lama dilakukan setelah pengujian lintas komponen di Phase 6.
 
 DaisyUI digunakan untuk komponen antarmuka; lihat [komponen DaisyUI](https://daisyui.com/components/) dan [panduan Next.js](https://daisyui.com/docs/install/nextjs/).

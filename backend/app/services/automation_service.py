@@ -53,7 +53,7 @@ def _entry_reasons(session: Session, entry: LogbookEntry) -> list[str]:
         reasons.append("Entri belum disetujui.")
     if entry.source_conflict:
         reasons.append("Perubahan pada dokumen sumber belum ditinjau.")
-    if entry.status in {"processing", "submitted", "verification_needed", "skipped"} or entry.portal_entry_id:
+    if entry.status in {"processing", "submitted", "verification_needed", "skipped"}:
         reasons.append("Entri sudah diproses atau perlu diperiksa sebelum dicoba lagi.")
     if not (entry.activity_text or "").strip():
         reasons.append("Uraian kegiatan belum diisi.")
