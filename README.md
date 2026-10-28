@@ -42,15 +42,73 @@ Saat ini aplikasi belum mengirim permintaan ke Gemini; key boleh dibiarkan koson
 
 ## Setup Google Docs
 
-1. Buka atau buat proyek di [Google Cloud Console](https://console.cloud.google.com/).
-2. Aktifkan **Google Docs API** dari **APIs & Services → Library**.
-3. Atur layar persetujuan OAuth. Jika status aplikasi masih *Testing*, tambahkan akun Google yang akan dipakai sebagai pengguna uji.
-4. Buat OAuth client dengan jenis aplikasi **Desktop app**, lalu unduh file JSON-nya.
-5. Simpan file tersebut sebagai `backend/.local/google-oauth-client.json`. Folder `.local` diabaikan Git; jangan unggah file ini ke repository.
-6. Jalankan Logpilot, pilih **Hubungkan Google Docs**, lalu setujui akses baca pada browser yang terbuka.
-7. Tempel URL atau ID dokumen ke dashboard. Akun Google yang terhubung harus memiliki akses lihat ke dokumen itu.
+Setiap pengguna sebaiknya memakai proyek Google Cloud dan OAuth client miliknya sendiri. Setup ini hanya mengizinkan Logpilot membaca dokumen; Logpilot tidak mengubah dokumen sumber.
 
-Logpilot meminta scope `documents.readonly`; dokumen asli tidak diubah. Token persetujuan disimpan di `backend/.local/google-token.json` pada komputer ini dan juga diabaikan Git. Hapus file token itu untuk memutus koneksi. Untuk menghubungkan lagi, ulangi langkah koneksi dari dashboard.
+### 1. Buat proyek Google Cloud
+
+1. Buka [Google Cloud Console](https://console.cloud.google.com/) dan masuk dengan akun Google yang akan mengelola konfigurasi.
+2. Buka pemilih proyek di bagian atas halaman. Pilih proyek yang sudah ada atau pilih **New Project**, beri nama, lalu buat proyek.
+3. Pastikan proyek tersebut terpilih sebelum melanjutkan. Pengaktifan API dan OAuth client harus berada pada proyek yang sama.
+
+### 2. Aktifkan Google Docs API
+
+1. Buka **APIs & Services → Library**. Jika alamat menu berubah, gunakan [API Library](https://console.cloud.google.com/apis/library).
+2. Cari **Google Docs API**, buka hasil yang namanya tepat sama, lalu pilih **Enable**.
+3. Pastikan nama proyek yang aktif di bagian atas adalah proyek yang baru kamu pilih.
+
+### 3. Atur layar persetujuan OAuth
+
+1. Buka **Google Auth Platform → Branding**. Pada proyek yang belum dikonfigurasi, pilih **Get Started**.
+2. Isi **App name** (misalnya `Logpilot Lokal`) dan **User support email**. Lanjutkan.
+3. Pada **Audience**, pilih **Internal** hanya jika semua akun yang akan memakai aplikasi berada dalam organisasi Google Workspace yang sama. Untuk akun pribadi atau pengguna di luar organisasi, pilih **External**.
+4. Isi **Contact Information**, tinjau kebijakan data Google, lalu selesaikan pembuatan konfigurasi.
+5. Jika memilih **External** dan status aplikasi **Testing**, buka **Google Auth Platform → Audience → Test users → Add users**. Tambahkan alamat akun Google yang nanti akan dipakai untuk menghubungkan dokumen, lalu simpan. Akun yang belum terdaftar sebagai test user tidak dapat menyelesaikan persetujuan saat aplikasi masih dalam mode pengujian.
+6. Pada **Data Access**, bila tersedia, tambahkan hanya scope baca Google Docs berikut: `https://www.googleapis.com/auth/documents.readonly`. Jangan pilih scope edit.
+
+Pilihan **Internal** hanya berlaku untuk akun dalam organisasi Workspace tersebut dan dapat dibatasi oleh administrator organisasi. Jika ragu atau memakai akun Gmail pribadi, pilih **External** lalu tambahkan akunmu sebagai test user.
+
+### 4. Buat OAuth client untuk aplikasi desktop
+
+1. Buka **Google Auth Platform → Clients**, lalu pilih **Create Client**.
+2. Pada **Application type**, pilih **Desktop app**. Jangan pilih **Web application**; Logpilot berjalan lokal dan membuka persetujuan Google di browser.
+3. Beri nama, misalnya `Logpilot Windows`, lalu pilih **Create**.
+4. Unduh JSON konfigurasi dari dialog hasil pembuatan atau dari daftar client. Jika unduhan tidak dimulai otomatis, buka client tersebut dan pilih unduh konfigurasi JSON.
+
+### 5. Simpan file konfigurasi pada lokasi yang benar
+
+1. Di dalam folder proyek, buka folder `backend`. Jika belum ada, buat subfolder bernama `.local`.
+2. Pindahkan file JSON yang diunduh ke folder itu dan ubah namanya persis menjadi:
+
+       backend/.local/google-oauth-client.json
+
+3. Pastikan Windows tidak menambahkan ekstensi kedua, seperti `google-oauth-client.json.json`. Jangan mengedit isi JSON atau mengirimkannya ke orang lain.
+
+Folder `backend/.local` dan token OAuth di dalamnya diabaikan Git. Jangan unggah atau commit keduanya.
+
+### 6. Hubungkan akun dari Logpilot
+
+1. Jalankan setup jika belum pernah dilakukan, lalu mulai aplikasi:
+
+       .\scripts\setup.ps1
+       .\scripts\start.ps1
+
+2. Buka http://localhost:3000 dan pilih **Hubungkan Google Docs**.
+3. Browser akan membuka halaman Google. Pilih akun yang sudah ditambahkan sebagai test user jika aplikasinya berstatus **External / Testing**.
+4. Tinjau permintaan akses dan lanjutkan hanya jika Logpilot meminta akses baca Google Docs. Setelah Google menyatakan koneksi berhasil, kembali ke dashboard.
+5. Tempel URL atau ID Google Docs. Pastikan akun yang terhubung memiliki akses **Viewer** ke dokumen; akses yang hanya diberikan kepada akun Google lain tidak cukup.
+6. Pilih rentang tanggal dan jalankan pemeriksaan. Tanggal tanpa baris akan ditampilkan untuk ditinjau, bukan otomatis dianggap sebagai hari kerja yang terlewat.
+
+Contoh URL yang diterima adalah `https://docs.google.com/document/d/ID_DOKUMEN/edit`. Logpilot juga menerima ID dokumen saja. Tautan folder Drive atau URL `drive.google.com/file` bukan URL dokumen Google Docs.
+
+### Jika koneksi gagal
+
+- **Google Docs belum disiapkan:** pastikan nama file tepat `backend/.local/google-oauth-client.json`, berada di folder proyek yang benar, dan backend sudah dijalankan.
+- **Akses aplikasi diblokir saat Testing:** periksa **Google Auth Platform → Audience → Test users** dan tambahkan akun yang sedang dipilih di browser.
+- **API tidak diaktifkan atau respons 403:** pastikan **Google Docs API** diaktifkan pada proyek yang sama dengan OAuth client.
+- **Dokumen tidak dapat dibaca:** periksa URL/ID dan pastikan akun yang terhubung dapat membuka dokumen sebagai Viewer.
+- **Ingin menghubungkan ulang atau mengganti akun:** hentikan aplikasi, hapus `backend/.local/google-token.json`, mulai kembali aplikasi, lalu hubungkan lagi dari dashboard.
+
+Logpilot meminta scope `documents.readonly`. Token persetujuan dibuat otomatis di `backend/.local/google-token.json` pada komputer ini dan tidak masuk Git. Untuk rincian istilah atau tampilan Cloud Console terbaru, lihat [Google Docs API Python quickstart](https://developers.google.com/workspace/docs/api/quickstart/python), [panduan layar persetujuan OAuth](https://developers.google.com/workspace/guides/configure-oauth-consent), dan [panduan mengaktifkan Google Workspace API](https://developers.google.com/workspace/guides/enable-apis).
 
 Parser mengenali sejumlah variasi header Indonesia dan Inggris serta beberapa format tanggal. Jika header aktivitas pada sebuah template belum dikenali, baris akan ditandai untuk ditinjau dan tidak ditebak sebagai kegiatan. Pemetaan template yang belum dikenal akan ditambahkan pada fase berikutnya.
 
@@ -74,6 +132,7 @@ Migrasi bisa dijalankan ulang dengan:
 
 - Pilih tanggal mulai dan akhir sesuai periode masing-masing. Rentang bersifat inklusif; tanggal akhir harus sama dengan atau setelah tanggal mulai. Pilihan cepat tersedia untuk 3 hari dan 1 minggu.
 - Dashboard membaca Google Docs dan hanya menyimpan catatan dalam rentang yang dipilih. Dashboard menunjukkan tanggal yang terisi, kosong, izin/sakit, perlu ditinjau, atau tidak tercantum. Status tidak tercantum perlu dicocokkan dengan jadwal magang karena belum tentu hari kerja.
+- Entri dalam rentang pilihan dapat disunting dan disetujui satu per satu. Jam bawaan hanya diterapkan setelah pengguna meninjau jumlah entri dan mengonfirmasi penerapannya. Persetujuan ini belum mengirim catatan ke portal.
 - Impor CSV/PDF dan pengiriman entri ke portal belum tersedia. Otomasi tidak akan pernah menekan tombol “Selesaikan Logbook Magang”.
 
 DaisyUI digunakan untuk komponen antarmuka; lihat [komponen DaisyUI](https://daisyui.com/components/) dan [panduan Next.js](https://daisyui.com/docs/install/nextjs/).
