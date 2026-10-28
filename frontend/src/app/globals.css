@@ -89,6 +89,14 @@ details[open] > .disclosure-summary::after {
   min-height: 2.75rem;
 }
 
+.btn.btn-ai-compact {
+  min-height: 2.5rem;
+  height: 2.5rem;
+  gap: 0.5rem;
+  padding-inline: 0.75rem;
+  font-size: 0.8125rem;
+}
+
 .btn:hover:not(:disabled) {
   transform: translateY(-1px);
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 27%), 0 2px 4px rgb(24 53 46 / 10%), 0 5px 12px rgb(24 53 46 / 8%);

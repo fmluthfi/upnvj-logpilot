@@ -334,7 +334,7 @@ export function PortalAutomation({ range, onRefresh }: { range: DateRange; onRef
               {backendAvailable === false && <p className="text-sm text-error-content">Jalankan kembali backend lokal Logpilot.</p>}
               {paired && <p className="text-sm text-base-content/70">Sambungan extension aktif.</p>}
               {backendAvailable && !paired && !pairingCode && (
-                <button type="button" className="btn btn-outline btn-sm" disabled={busy} onClick={createPairingCode}>
+                <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={createPairingCode}>
                   {busy ? "Membuat kode…" : "Buat kode pairing"}
                 </button>
               )}

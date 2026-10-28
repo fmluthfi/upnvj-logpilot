@@ -193,19 +193,17 @@ export function LogbookEntryRow({ entry, onSave, onApprove, onGenerateResult, on
 
       <div className="grid gap-5 sm:grid-cols-2 sm:gap-6">
         <div className="form-control min-w-0 gap-1">
-          <div className="label w-full min-w-0 flex-wrap justify-between gap-3 py-1">
-            <span className="label-text text-sm font-medium">Hasil</span>
-            {!isReadOnly && (
-              <button type="button" aria-label="Buat hasil dengan AI menggunakan Groq" className="btn btn-secondary btn-sm min-h-11 gap-2 border border-primary/20 px-3" disabled={!draft.activity_text.trim() || generatingResult || saving || approving} onClick={generateResult}>
-                <Image src="/groq-mark.svg" width={18} height={28} alt="" aria-hidden="true" unoptimized className="h-7 w-[18px] shrink-0 object-contain" />
-                <span>{generatingResult ? "Membuat…" : "Buat dengan AI"}</span>
-              </button>
-            )}
-          </div>
+          <span className="flex min-h-11 items-center text-sm font-medium">Hasil</span>
           <textarea className="textarea textarea-bordered min-h-28 w-full bg-base-100" value={draft.result_text} disabled={isReadOnly} maxLength={5000} onChange={(event) => updateField("result_text", event.target.value)} />
+          {!isReadOnly && (
+            <button type="button" aria-label="Buat hasil dengan AI menggunakan Groq" className="btn btn-primary btn-ai-compact mt-2 self-start" disabled={!draft.activity_text.trim() || generatingResult || saving || approving} onClick={generateResult}>
+              <Image src="/groq-mark.svg" width={12} height={18} alt="" aria-hidden="true" unoptimized className="h-[18px] w-3 shrink-0 object-contain" />
+              <span>{generatingResult ? "Membuat…" : "Buat dengan AI"}</span>
+            </button>
+          )}
         </div>
         <label className="form-control min-w-0 gap-1">
-          <span className="label py-1"><span className="label-text text-sm font-medium">Kendala</span></span>
+          <span className="flex min-h-11 items-center text-sm font-medium">Kendala</span>
           <textarea className="textarea textarea-bordered min-h-28 w-full bg-base-100" value={draft.obstacle_text} disabled={isReadOnly} maxLength={5000} onChange={(event) => updateField("obstacle_text", event.target.value)} />
         </label>
       </div>
