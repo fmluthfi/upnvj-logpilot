@@ -300,6 +300,13 @@ export function PortalAutomation({ range, onRefresh }: { range: DateRange; onRef
   const submittedCount = run?.completed_entries ?? 0;
   const updatedCount = run?.counts.updated ?? 0;
   const processingEntry = run?.entries.find((entry) => entry.status === "processing");
+  const pairingStatus = backendAvailable === false
+    ? "Backend terputus"
+    : paired === null
+      ? "Memeriksa…"
+      : paired
+        ? "Pairing aktif"
+        : "Belum dipasangkan";
 
   return (
     <section aria-labelledby="automation-title" className="mt-6">
@@ -316,40 +323,33 @@ export function PortalAutomation({ range, onRefresh }: { range: DateRange; onRef
             <p>Logpilot hanya menyimpan entri harian. Penyelesaian logbook tetap kamu lakukan sendiri di portal.</p>
           </div>
 
-          <div className="space-y-3 border-t border-base-300 pt-5" aria-live="polite">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h3 className="font-semibold">Chrome extension</h3>
-                <p className="mt-1 text-sm text-base-content/70">
-                  {backendAvailable === false
-                    ? "Backend lokal tidak tersedia. Jalankan kembali Logpilot."
-                    : paired === null
-                      ? "Memeriksa sambungan backend dan extension."
-                      : paired
-                        ? "Pairing aktif. Status browser ditampilkan di popup extension."
-                        : "Hubungkan extension dari popup agar bisa menjalankan batch."}
-                </p>
-              </div>
+          <details className="border-t border-base-300 pt-4" aria-live="polite">
+            <summary className="disclosure-summary flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+              <h3 className="font-semibold">Chrome extension</h3>
               <span className={`badge ${backendAvailable === false ? "badge-error" : paired ? "badge-success" : "badge-outline"}`}>
-                {backendAvailable === false ? "Backend terputus" : paired === null ? "Memeriksa…" : paired ? "Pairing aktif" : "Belum dipasangkan"}
+                {pairingStatus}
               </span>
-            </div>
-            {backendAvailable && !paired && !pairingCode && (
-              <button type="button" className="btn btn-outline btn-sm" disabled={busy} onClick={createPairingCode}>
-                {busy ? "Membuat kode…" : "Buat kode pairing"}
-              </button>
-            )}
-            {pairingCode && (
-              <div className="rounded-box bg-base-200 p-4">
-                <p className="text-sm leading-6">Tempel kode ini di popup extension. Berlaku sampai {formatTime(pairingCode.expires_at)}.</p>
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <code className="min-w-0 flex-1 break-all rounded-box bg-base-100 px-3 py-2 text-sm">{pairingCode.pairing_code}</code>
-                  <button type="button" className="btn btn-outline btn-sm" onClick={copyPairingCode}>Salin kode</button>
+            </summary>
+            <div className="mt-4 space-y-3">
+              {backendAvailable === false && <p className="text-sm text-error-content">Jalankan kembali backend lokal Logpilot.</p>}
+              {paired && <p className="text-sm text-base-content/70">Sambungan extension aktif.</p>}
+              {backendAvailable && !paired && !pairingCode && (
+                <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={createPairingCode}>
+                  {busy ? "Membuat kode…" : "Buat kode pairing"}
+                </button>
+              )}
+              {pairingCode && (
+                <div className="rounded-box bg-base-200 p-4">
+                  <p className="text-sm leading-6">Tempel kode ini di popup extension. Berlaku sampai {formatTime(pairingCode.expires_at)}.</p>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <code className="min-w-0 flex-1 break-all rounded-box bg-base-100 px-3 py-2 text-sm">{pairingCode.pairing_code}</code>
+                    <button type="button" className="btn btn-outline btn-sm" onClick={copyPairingCode}>Salin kode</button>
+                  </div>
                 </div>
-              </div>
-            )}
-            {pairingMessage && <p role="status" className="text-sm text-base-content/75">{pairingMessage}</p>}
-          </div>
+              )}
+              {pairingMessage && <p role="status" className="text-sm text-base-content/75">{pairingMessage}</p>}
+            </div>
+          </details>
 
           {run && (
             <div className="rounded-box border border-base-300 p-4 sm:p-5" aria-live="polite">
@@ -363,7 +363,7 @@ export function PortalAutomation({ range, onRefresh }: { range: DateRange; onRef
                         : STATUS_LABELS[run.status] ?? "Status automation"}
                   </h3>
                   <p className="mt-1 text-sm text-base-content/70">
-                    {formatDate(run.start_date)} — {formatDate(run.end_date)}
+                    {formatDate(run.start_date)} sampai {formatDate(run.end_date)}
                   </p>
                 </div>
                 <span className="badge badge-outline">{submittedCount} dari {run.total_entries} tersimpan</span>

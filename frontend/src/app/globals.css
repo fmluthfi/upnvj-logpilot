@@ -29,9 +29,9 @@
   --color-warning-content: #563817;
   --color-error: #f8dddd;
   --color-error-content: #682525;
-  --radius-selector: 0.75rem;
-  --radius-field: 0.8rem;
-  --radius-box: 1.2rem;
+  --radius-selector: 0.65rem;
+  --radius-field: 0.65rem;
+  --radius-box: 0.9rem;
   --border: 1px;
   --depth: 0;
   --noise: 0;
@@ -45,10 +45,154 @@ body {
   min-height: 100vh;
   background: var(--color-base-200);
   color: var(--color-base-content);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 ::selection {
   background: #c8e8d6;
   color: #17352e;
+}
+
+.disclosure-summary::-webkit-details-marker {
+  display: none;
+}
+
+.disclosure-summary::after {
+  width: 0.5rem;
+  height: 0.5rem;
+  flex: none;
+  margin-left: auto;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  content: "";
+  transform: rotate(45deg);
+  transition: transform 140ms ease;
+}
+
+details[open] > .disclosure-summary::after {
+  transform: rotate(225deg);
+}
+
+.card.bg-base-100 {
+  box-shadow: 0 1px 2px rgb(24 53 46 / 4%);
+}
+
+.btn {
+  min-height: 2.75rem;
+  border-width: 1px;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 24%), 0 1px 2px rgb(24 53 46 / 10%), 0 3px 8px rgb(24 53 46 / 6%);
+  transition: transform 140ms ease, box-shadow 140ms ease, background-color 140ms ease, border-color 140ms ease;
+}
+
+.btn.btn-sm,
+.btn.btn-xs {
+  min-height: 2.75rem;
+}
+
+.btn.btn-ai-compact {
+  min-height: 2.5rem;
+  height: 2.5rem;
+  gap: 0.5rem;
+  padding-inline: 0.75rem;
+  font-size: 0.8125rem;
+}
+
+.btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 27%), 0 2px 4px rgb(24 53 46 / 10%), 0 5px 12px rgb(24 53 46 / 8%);
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: inset 0 2px 4px rgb(24 53 46 / 14%), 0 1px 1px rgb(24 53 46 / 6%);
+  transition-duration: 80ms;
+}
+
+.btn.btn-primary {
+  border-color: #0d5a48;
+  background: linear-gradient(180deg, #19755f 0%, #126b57 100%);
+  color: #f3fff8;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 34%), inset 0 -1px 0 rgb(5 58 46 / 28%), 0 1px 2px rgb(24 53 46 / 14%), 0 3px 7px rgb(24 53 46 / 10%);
+}
+
+.btn.btn-primary:hover:not(:disabled) {
+  background: linear-gradient(180deg, #1c7d65 0%, #126653 100%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 42%), inset 0 -1px 0 rgb(5 58 46 / 28%), 0 2px 4px rgb(24 53 46 / 15%), 0 5px 10px rgb(24 53 46 / 12%);
+}
+
+.btn.btn-primary:active:not(:disabled) {
+  background: linear-gradient(180deg, #126b57 0%, #0f5c4b 100%);
+  box-shadow: inset 0 2px 3px rgb(5 58 46 / 28%), 0 1px 1px rgb(24 53 46 / 7%);
+}
+
+.btn.btn-outline {
+  border-color: color-mix(in srgb, var(--color-base-content) 48%, transparent);
+  background: var(--color-base-100);
+}
+
+.btn.btn-ghost {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.btn.btn-ghost:hover:not(:disabled) {
+  background: var(--color-base-200);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 60%), 0 1px 3px rgb(24 53 46 / 7%);
+}
+
+.btn:disabled {
+  transform: none;
+  border-color: #d0dad4;
+  background: #e5eae7;
+  box-shadow: none;
+  color: #52655e;
+  cursor: not-allowed;
+  opacity: 1;
+}
+
+.btn:focus-visible,
+.input-bordered:focus-visible,
+.textarea-bordered:focus-visible,
+.select-bordered:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.input-bordered,
+.textarea-bordered,
+.select-bordered {
+  border-color: #c7d4cd;
+  box-shadow: inset 0 1px 2px rgb(24 53 46 / 4%);
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.input-bordered:focus,
+.textarea-bordered:focus,
+.select-bordered:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgb(18 107 87 / 18%);
+  outline: none;
+}
+
+.input-bordered:focus-visible,
+.textarea-bordered:focus-visible,
+.select-bordered:focus-visible {
+  outline: 2px solid var(--color-primary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+
+  .btn:hover:not(:disabled),
+  .btn:active:not(:disabled) {
+    transform: none;
+  }
 }

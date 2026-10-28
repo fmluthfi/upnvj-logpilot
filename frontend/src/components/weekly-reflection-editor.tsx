@@ -76,6 +76,17 @@ export function WeeklyReflectionEditor({ range, refreshKey }: Props) {
   const hasFacts = Boolean(data?.days.some((day) => day.entries.some((entry) =>
     entry.activity.trim() || entry.result.trim() || entry.obstacle.trim(),
   )));
+  const reflectionStatus = loading
+    ? "Memuat…"
+    : loadError
+      ? "Perlu diperiksa"
+      : data?.approved
+        ? "Disetujui"
+        : dirty
+          ? "Belum disimpan"
+          : data?.reflection_text.trim()
+            ? "Draf tersimpan"
+            : "Belum dibuat";
 
   useEffect(() => {
     let active = true;
@@ -178,22 +189,24 @@ export function WeeklyReflectionEditor({ range, refreshKey }: Props) {
 
   return (
     <section aria-labelledby="reflection-title" className="mt-6">
-      <div className="card border border-base-300 bg-base-100 shadow-sm">
-        <div className="card-body gap-5 p-5 sm:p-7">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <h2 id="reflection-title" className="card-title text-xl">Refleksi mingguan</h2>
-              <p className="mt-1 text-sm leading-6 text-base-content/70">
-                Pilih Jumat. Catatan yang dibaca mencakup Senin sampai Jumat pada pekan tersebut.
-              </p>
-            </div>
-            <label className="form-control w-full sm:w-64">
-              <span className="label py-1"><span className="label-text text-xs">Pekan berakhir</span></span>
-              <select className="select select-bordered bg-base-100" value={friday} onChange={(event) => setFriday(event.target.value)}>
-                {weeks.map((value) => <option key={value} value={value}>{displayDate(value)}</option>)}
-              </select>
-            </label>
+      <details className="card disclosure-panel border border-base-300 bg-base-100 shadow-sm">
+        <summary className="disclosure-summary flex min-h-16 cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:px-7">
+          <div className="min-w-0">
+            <h2 id="reflection-title" className="card-title text-xl">Refleksi mingguan</h2>
+            <p className="mt-1 truncate text-sm text-base-content/70">Pekan berakhir {displayDate(friday)}</p>
           </div>
+          <span className={`badge shrink-0 ${data?.approved ? "badge-success" : data?.stale || loadError ? "badge-warning" : "badge-outline"}`}>
+            {reflectionStatus}
+          </span>
+        </summary>
+
+        <div className="card-body gap-5 border-t border-base-300 p-5 sm:p-7">
+          <label className="form-control w-full sm:max-w-64">
+            <span className="label py-1"><span className="label-text text-xs">Pekan berakhir</span></span>
+            <select className="select select-bordered bg-base-100" value={friday} onChange={(event) => setFriday(event.target.value)}>
+              {weeks.map((value) => <option key={value} value={value}>{displayDate(value)}</option>)}
+            </select>
+          </label>
 
           {loadError && <div role="alert" className="alert alert-warning text-sm">{loadError}</div>}
           {loading ? (
@@ -225,31 +238,37 @@ export function WeeklyReflectionEditor({ range, refreshKey }: Props) {
                 </div>
               )}
 
-              <div className="divide-y divide-base-300 rounded-box border border-base-300 px-4">
-                {data.days.map((day) => (
-                  <div key={day.date} className="grid gap-2 py-3 sm:grid-cols-[12rem_1fr] sm:items-start">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-sm font-medium">{displayDate(day.date)}</span>
-                      <span className={`badge ${day.status === "filled" ? "badge-success" : day.status === "needs_review" ? "badge-warning" : "badge-outline"}`}>
-                        {DAY_STATUS[day.status]}
-                      </span>
+              <section aria-labelledby="reflection-source-title" className="pt-2">
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2 border-b border-base-300 pb-3">
+                  <h3 id="reflection-source-title" className="font-medium">Catatan pekan ini</h3>
+                  <span className="text-sm text-base-content/65">{data.days.length} hari</span>
+                </div>
+                <div className="divide-y divide-base-300">
+                  {data.days.map((day) => (
+                    <div key={day.date} className="grid gap-2 py-3 sm:grid-cols-[12rem_1fr] sm:items-start">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-sm font-medium">{displayDate(day.date)}</span>
+                        <span className={`badge ${day.status === "filled" ? "badge-success" : day.status === "needs_review" ? "badge-warning" : "badge-outline"}`}>
+                          {DAY_STATUS[day.status]}
+                        </span>
+                      </div>
+                      <div className="space-y-1 text-sm leading-6 text-base-content/80">
+                        {day.entries.length ? day.entries.map((entry, index) => (
+                          <div key={`${day.date}-${index}`}>
+                            {entry.activity && <p>{entry.activity}</p>}
+                            {entry.result && <p className="text-base-content/65">Hasil: {entry.result}</p>}
+                            {entry.obstacle && <p className="text-base-content/65">Kendala: {entry.obstacle}</p>}
+                          </div>
+                        )) : (
+                          <p className="text-base-content/65">
+                            {day.status === "leave" ? "Izin atau hari non-kerja tercatat; rinciannya tidak dikirim ke GroqCloud." : day.status === "missing" ? "Belum ada entri pada sumber." : "Isi entri perlu ditinjau."}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                    <div className="space-y-1 text-sm leading-6 text-base-content/80">
-                      {day.entries.length ? day.entries.map((entry, index) => (
-                        <div key={`${day.date}-${index}`}>
-                          {entry.activity && <p>{entry.activity}</p>}
-                          {entry.result && <p className="text-base-content/65">Hasil: {entry.result}</p>}
-                          {entry.obstacle && <p className="text-base-content/65">Kendala: {entry.obstacle}</p>}
-                        </div>
-                      )) : (
-                        <p className="text-base-content/65">
-                          {day.status === "leave" ? "Izin atau hari non-kerja tercatat; rinciannya tidak dikirim ke GroqCloud." : day.status === "missing" ? "Belum ada entri pada sumber." : "Isi entri perlu ditinjau."}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              </section>
 
               <div className="form-control min-w-0">
                 <label htmlFor="weekly-reflection-draft" className="label py-1">
@@ -288,7 +307,7 @@ export function WeeklyReflectionEditor({ range, refreshKey }: Props) {
                 <button type="button" className="btn btn-primary btn-sm" disabled={!privacyConfirmed || !hasFacts || data.has_conflicts || busy !== ""} onClick={generate}>
                   {busy === "generate" ? "Membuat draf…" : data.reflection_text && !data.stale ? "Buat ulang draf" : "Buat draf dengan GroqCloud"}
                 </button>
-                <button type="button" className="btn btn-outline btn-sm" disabled={!dirty || (data.stale && !sourceReviewed) || busy !== ""} onClick={saveDraft}>
+                <button type="button" className={`btn ${dirty ? "btn-primary" : "btn-outline"} btn-sm`} disabled={!dirty || (data.stale && !sourceReviewed) || busy !== ""} onClick={saveDraft}>
                   {busy === "save" ? "Menyimpan…" : "Simpan draf"}
                 </button>
                 <button type="button" className="btn btn-secondary btn-sm" disabled={!data.reflection_text.trim() || dirty || data.stale || data.has_conflicts || data.approved || busy !== ""} onClick={approve}>
@@ -299,7 +318,7 @@ export function WeeklyReflectionEditor({ range, refreshKey }: Props) {
             </>
           )}
         </div>
-      </div>
+      </details>
     </section>
   );
 }

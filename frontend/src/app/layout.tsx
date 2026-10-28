@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Logpilot — Otomasi Logbook Magang",
+  title: "Logpilot | Otomasi Logbook Magang",
   description: "Siapkan catatan logbook magang dari Google Docs untuk rentang tanggal pilihanmu.",
 };
 

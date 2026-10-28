@@ -162,7 +162,7 @@ export function EntryDefaultHours({ range, eligibleCount, documentationEligibleC
           </div>
           <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-3">
             <p className="text-xs leading-5 text-base-content/65">Format jam 24 jam: HH:MM.</p>
-            <button type="submit" className="btn btn-outline btn-sm" disabled={loading || saving || !settingsDirty}>
+            <button type="submit" className={`btn ${settingsDirty ? "btn-primary" : "btn-outline"} btn-sm`} disabled={loading || saving || !settingsDirty}>
               {saving ? "Menyimpan…" : "Simpan pengaturan"}
             </button>
           </div>
