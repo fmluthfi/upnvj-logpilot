@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Logpilot</title>
+    <link rel="stylesheet" href="popup.css">
+    <script src="dist/popup/popup.js" defer></script>
+  </head>
+  <body>
+    <main class="popup-shell">
+      <header class="topbar">
+        <div class="brand">
+          <img src="assets/logpilot-mark.png" alt="" width="38" height="38">
+          <h1>Logpilot</h1>
+        </div>
+        <span id="backend-status" class="status-badge" aria-live="polite">Memeriksa…</span>
+      </header>
+
+      <section class="portal-panel" aria-labelledby="portal-heading">
+        <div class="panel-heading">
+          <h2 id="portal-heading">Portal logbook</h2>
+          <span id="portal-status" class="status-badge">Memeriksa…</span>
+        </div>
+        <p id="portal-copy">Memeriksa tab portal yang aktif.</p>
+        <button id="open-portal-button" class="button button-outline" type="button">Buka halaman logbook</button>
+      </section>
+
+      <section id="connect-section" class="connect-panel" aria-labelledby="connect-heading">
+        <h2 id="connect-heading">Hubungkan ekstensi</h2>
+        <p>Masukkan kode sementara yang dibuat dari dashboard Logpilot.</p>
+        <label for="pairing-code">Kode pairing</label>
+        <input id="pairing-code" type="password" inputmode="text" autocomplete="one-time-code" spellcheck="false" placeholder="Tempel kode dari dashboard">
+        <button id="connect-button" class="button button-primary" type="button">Hubungkan ekstensi</button>
+      </section>
+
+      <section id="paired-section" class="connect-panel" aria-labelledby="paired-heading" hidden>
+        <h2 id="paired-heading">Ekstensi terhubung</h2>
+        <p>Kredensial disimpan di penyimpanan privat ekstensi dan tidak dibagikan ke halaman portal.</p>
+        <button id="unpair-button" class="button button-outline" type="button">Putuskan sambungan</button>
+      </section>
+
+      <p id="feedback" class="feedback" role="status" aria-live="polite"></p>
+      <footer>
+        <span>Siapkan dan tinjau entri dari dashboard sebelum automation.</span>
+        <button id="refresh-button" class="text-button" type="button">Periksa status</button>
+      </footer>
+    </main>
+  </body>
+</html>
