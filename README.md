@@ -1,193 +1,170 @@
-# Logpilot
+<p align="center">
+  <img src="frontend/public/logpilot-mark.png" alt="Logo Logpilot" width="112">
+</p>
 
-Dashboard lokal untuk menyiapkan, meninjau, dan mengelola logbook magang. Data setiap mahasiswa memiliki periode sendiri; pemilih tanggal tidak memakai batas dari dokumen contoh.
+<h1 align="center">Logpilot</h1>
 
-## Kebutuhan
+<p align="center">Siapkan, tinjau, dan isi logbook magang UPNVJ dari catatan Google Docs.</p>
 
-- Windows 10 atau 11
-- Python 3.11 atau lebih baru
-- Node.js 20.9 atau lebih baru, beserta npm
-- Git
+<p align="center">
+  <a href="#mulai-cepat">Mulai cepat</a> ·
+  <a href="#hubungkan-google-docs">Google Docs</a> ·
+  <a href="#aktifkan-groqcloud">GroqCloud</a> ·
+  <a href="#pasang-chrome-extension">Chrome extension</a> ·
+  <a href="#jika-ada-masalah">Bantuan</a>
+</p>
 
-## Setup
+Logpilot berjalan di komputer pengguna. Dashboard membaca Google Docs, menampilkan catatan per tanggal, dan menyiapkan entri yang disetujui. Chrome extension mengisi serta menyimpan entri harian melalui sesi portal yang sudah dibuka pengguna.
 
-Clone repository, lalu jalankan PowerShell dari folder proyek:
+**Batas penting:** Logpilot tidak menekan tombol **Selesaikan Logbook Magang**. Penyelesaian logbook dilakukan sendiri di portal.
 
-    git clone https://github.com/kanigaraa/upnvj-logpilot.git
-    cd upnvj-logpilot
-    .\scripts\setup.ps1
+## Yang bisa dilakukan
 
-Setup membuat virtual environment Python, memasang kebutuhan backend dan frontend, memasang Chromium yang masih dibutuhkan jalur Playwright lama, menyalin `backend/.env.example` menjadi `backend/.env` jika belum ada, membuat database lokal, dan menjalankan migrasi SQLite. Backend juga memeriksa migrasi sebelum mulai agar database mengikuti versi aplikasi. Setup tidak mengubah file sumber logbook.
+- Pilih rentang tanggal sesuai kebutuhan, termasuk beberapa hari atau sebagian dari masa magang. Tanggal mulai dan akhir tidak dibatasi contoh dokumen.
+- Lihat tanggal yang terisi, kosong, izin/sakit, perlu dipetakan, atau tidak ditemukan di dokumen. Tanggal tanpa catatan tetap perlu dicocokkan dengan jadwal magang masing-masing.
+- Sunting uraian, hasil, kendala, jam kerja format 24 jam, dan tautan dokumentasi sebelum menyetujui entri. Jam serta tautan dokumentasi dapat disimpan sebagai bawaan; nilai per entri tetap bisa diubah.
+- Buat draf hasil harian dan refleksi mingguan dengan GroqCloud, lalu tinjau dan sunting sebelum digunakan. Refleksi Jumat memakai catatan Senin sampai Jumat pada minggu yang sama, walaupun rentang unggah hanya mencakup sebagian minggu.
+- Siapkan batch dari entri yang disetujui. Extension membandingkan entri yang sudah ada di portal, melewati data yang sama, dan memakai form revisi untuk data yang berubah. Hasil Simpan yang tidak dapat dipastikan dihentikan untuk pemeriksaan; entri tersebut tidak dikirim ulang secara otomatis.
 
-Setelah setup selesai, jalankan:
+## Mulai cepat
 
-    .\scripts\start.ps1
+### 1. Siapkan komputer
 
-Skrip membuka terminal backend dan frontend agar log terlihat dan proses dapat dihentikan dengan Ctrl+C. Buka dashboard di http://localhost:3000. API tersedia di http://127.0.0.1:8000, health check di `/api/health`, dan dokumentasi interaktif di `/docs`.
+Panduan dan skrip otomatis ditujukan untuk **Windows 10/11** dengan PowerShell. Pasang **Python 3.11+**, **Node.js 20.9+** beserta npm, **Git**, dan **Google Chrome 102+**.
 
-Jika PowerShell menolak skrip karena execution policy, jalankan `Set-ExecutionPolicy -Scope Process Bypass` di terminal tersebut, lalu ulangi perintah setup. Perubahan ini hanya berlaku pada proses PowerShell yang sedang dibuka.
+Di PowerShell:
 
-## Setup GroqCloud
+```powershell
+git clone https://github.com/kanigaraa/upnvj-logpilot.git
+cd upnvj-logpilot
+.\scripts\setup.ps1
+```
 
-GroqCloud membantu membuat draf hasil harian dari uraian kegiatan dan refleksi mingguan. Tanpa API key, semua kolom tetap bisa diisi dan disimpan secara manual.
+Setup memasang dependensi Python dan frontend, membuat database SQLite serta migrasinya, dan menyalin `backend/.env.example` ke `backend/.env` bila file itu belum ada. Setup juga memasang Chromium untuk jalur Playwright lama. Dokumen sumber tidak diubah.
 
-### 1. Buat API key Groq
+Jika PowerShell menolak skrip, jalankan `Set-ExecutionPolicy -Scope Process Bypass` pada terminal yang sama, lalu ulangi setup. Pengaturan itu hanya berlaku untuk proses PowerShell tersebut.
 
-1. Masuk atau buat akun di [GroqCloud Console](https://console.groq.com/).
-2. Buka [API Keys](https://console.groq.com/keys), buat key, lalu salin dan simpan di tempat aman. Jangan kirim key melalui chat atau memasukkannya ke frontend maupun repository.
-3. Periksa [model yang tersedia](https://console.groq.com/docs/models) dan [batas penggunaan](https://console.groq.com/docs/rate-limits) di Console Groq. Model bawaan Logpilot adalah `openai/gpt-oss-20b` dan bisa diganti lewat konfigurasi.
+### 2. Siapkan sumber dan AI
 
-### 2. Simpan konfigurasi di backend
+- Ikuti [panduan Google Docs](#hubungkan-google-docs) untuk membuat OAuth client dan meletakkan file JSON pada lokasi yang benar. Ini diperlukan untuk membaca dokumen sumber.
+- Ikuti [panduan GroqCloud](#aktifkan-groqcloud) jika ingin membuat draf dengan AI. Tanpa API key, entri tetap dapat ditulis manual.
 
-1. Jalankan `.\scripts\setup.ps1` dari folder proyek jika `backend/.env` belum dibuat. Setup menyalin `backend/.env.example` dan memasang Groq Python SDK.
-2. Buka `backend/.env` dengan editor teks, lalu isi:
+### 3. Jalankan aplikasi
 
-       AI_PROVIDER=groq
-       GROQ_API_KEY=key-dari-groqcloud
-       GROQ_MODEL=openai/gpt-oss-20b
+```powershell
+.\scripts\start.ps1
+```
 
-3. Ganti `key-dari-groqcloud` dengan key yang kamu buat. Untuk memakai model lain, isi `GROQ_MODEL` dengan ID model dari GroqCloud.
-4. Simpan file. Konfigurasi berada di folder `backend`, tidak perlu variabel `NEXT_PUBLIC_`, dan `.env` diabaikan Git.
-5. Jika proyek sudah disiapkan sebelumnya, jalankan ulang `.\scripts\setup.ps1` agar dependensi backend diperbarui.
+Buka **http://localhost:3000**. Skrip membuka jendela backend dan frontend; hentikan keduanya dengan `Ctrl+C`. Backend tersedia di `http://127.0.0.1:8000`, health check di `/api/health`, dan dokumentasi API di `/docs`.
 
-### 3. Mulai ulang dan gunakan GroqCloud
+Untuk mengisi portal, lanjutkan ke [pemasangan Chrome extension](#pasang-chrome-extension). Login portal tetap dilakukan secara manual.
 
-1. Tutup jendela aplikasi dengan `Ctrl+C`, lalu jalankan `.\scripts\start.ps1` dari folder proyek agar backend membaca key dan model baru.
-2. Pilih rentang tanggal dan periksa Google Docs. Tombol **Buat dengan AI** merumuskan hasil yang tersirat langsung dari uraian kegiatan tanpa menambah capaian baru. Draf belum tersimpan sampai kamu memilih **Simpan perubahan**.
-3. Logpilot menyamarkan email, nomor telepon, serta nomor berlabel NIM/NPM/NIK/KTP sebelum mengirim teks. Tautan dokumentasi dan rincian izin tidak dikirim. Tinjau informasi sensitif lain sebelum membuat draf.
-4. Editor refleksi selalu menampilkan satu minggu kerja Senin sampai Jumat, terlepas dari rentang upload yang dipilih. Pilih **Buat draf dengan GroqCloud** untuk membuat atau membuat ulang refleksi. Hari yang belum memiliki entri ditandai agar kamu periksa sebelum menyetujui draf.
-5. Tinjau dan sunting draf, lalu simpan serta setujui setelah isinya benar. Saat entri Jumat yang disetujui diotomasi, refleksi tersebut ikut diisi pada entri harian Jumat. Tahap penyelesaian logbook tetap manual.
+## Hubungkan Google Docs
 
-API key hanya dibaca backend dari `backend/.env`. Jangan menaruh key di kode frontend, file README, screenshot, atau commit Git. Tanpa key yang valid, penggunaan AI menampilkan pesan yang dapat ditindaklanjuti; fitur dashboard lain tetap bisa digunakan.
+Setiap pengguna sebaiknya membuat proyek Google Cloud dan OAuth client sendiri. Logpilot meminta akses **baca saja** dan tidak mengubah dokumen sumber. Langkah berikut mengikuti [quickstart resmi Google Docs API](https://developers.google.com/workspace/docs/api/quickstart/python).
 
-### Jika GroqCloud gagal
+### 1. Buat proyek dan aktifkan API
 
-- **API key belum diatur:** isi `GROQ_API_KEY` di `backend/.env`, lalu mulai ulang aplikasi.
-- **API key ditolak:** pastikan key masih aktif dan tidak memiliki spasi atau tanda kutip tambahan.
-- **Batas penggunaan tercapai:** dashboard menampilkan pesan batas penggunaan. SDK mencoba ulang kegagalan sementara hingga dua kali dengan jeda bertambah; setelah itu tunggu batas pulih sebelum membuat draf lagi.
-- **Model tidak tersedia:** periksa ejaan `GROQ_MODEL` dan pilih ID model aktif di GroqCloud.
-- **Koneksi atau waktu tunggu:** periksa koneksi internet, lalu coba buat ulang draf.
-- **Jawaban kosong atau tidak sesuai:** periksa catatan sumber, lalu buat ulang atau tulis draf secara manual.
-- **Refleksi tidak sesuai dengan catatan terbaru:** tinjau perubahan sumber, buat draf baru, atau sunting draf sebelum menyetujuinya.
+1. Masuk ke [Google Cloud Console](https://console.cloud.google.com/), buka pemilih proyek di bagian atas, lalu buat proyek baru atau pilih proyek yang sudah ada.
+2. Di proyek tersebut, buka **APIs & Services → Library** atau [API Library](https://console.cloud.google.com/apis/library). Cari **Google Docs API** dan pilih **Enable**.
+3. Pastikan proyek yang tampil di bagian atas tetap sama saat membuat kredensial pada langkah berikutnya.
 
-Integrasi menggunakan [Groq Python SDK](https://github.com/groq/groq-python) dari backend dan memvalidasi keluaran JSON sebelum menyimpan draf. Lihat [panduan Groq](https://console.groq.com/docs/quickstart), [Structured Outputs](https://console.groq.com/docs/structured-outputs), dan [penanganan error SDK](https://github.com/groq/groq-python#handling-errors).
+### 2. Atur persetujuan OAuth
 
-## Setup Google Docs
+1. Buka **Google Auth Platform → Branding**. Jika belum dikonfigurasi, pilih **Get Started**. Isi nama aplikasi, email dukungan, dan email kontak.
+2. Pada **Audience**, pilih **Internal** hanya jika semua pengguna berada dalam organisasi Google Workspace yang sama. Untuk akun Gmail pribadi atau pengguna di luar organisasi, pilih **External**.
+3. Selesaikan konfigurasi. Jika aplikasi **External** masih berstatus **Testing**, buka **Audience → Test users → Add users** dan tambahkan akun Google yang akan dipakai untuk menghubungkan dokumen.
+4. Pada **Data Access**, bila diminta, tambahkan hanya scope `https://www.googleapis.com/auth/documents.readonly`. Jangan pilih akses edit.
 
-Setiap pengguna sebaiknya memakai proyek Google Cloud dan OAuth client miliknya sendiri. Setup ini hanya mengizinkan Logpilot membaca dokumen; Logpilot tidak mengubah dokumen sumber.
+Google menjelaskan pilihan audience dan test user dalam [panduan OAuth consent](https://developers.google.com/workspace/guides/configure-oauth-consent).
 
-### 1. Buat proyek Google Cloud
+### 3. Buat OAuth client desktop
 
-1. Buka [Google Cloud Console](https://console.cloud.google.com/) dan masuk dengan akun Google yang akan mengelola konfigurasi.
-2. Buka pemilih proyek di bagian atas halaman. Pilih proyek yang sudah ada atau pilih **New Project**, beri nama, lalu buat proyek.
-3. Pastikan proyek tersebut terpilih sebelum melanjutkan. Pengaktifan API dan OAuth client harus berada pada proyek yang sama.
+1. Buka **Google Auth Platform → Clients → Create Client**.
+2. Pilih **Desktop app**, beri nama, lalu buat client. Jangan pilih **Web application**.
+3. Unduh file JSON kredensial. Simpan di proyek dengan nama persis:
 
-### 2. Aktifkan Google Docs API
+   ```text
+   backend/.local/google-oauth-client.json
+   ```
 
-1. Buka **APIs & Services → Library**. Jika alamat menu berubah, gunakan [API Library](https://console.cloud.google.com/apis/library).
-2. Cari **Google Docs API**, buka hasil yang namanya tepat sama, lalu pilih **Enable**.
-3. Pastikan nama proyek yang aktif di bagian atas adalah proyek yang baru kamu pilih.
+   Buat folder `backend/.local` bila belum ada. Pastikan Windows tidak memberi nama ganda seperti `google-oauth-client.json.json`.
 
-### 3. Atur layar persetujuan OAuth
+### 4. Hubungkan dokumen di dashboard
 
-1. Buka **Google Auth Platform → Branding**. Pada proyek yang belum dikonfigurasi, pilih **Get Started**.
-2. Isi **App name** (misalnya `Logpilot Lokal`) dan **User support email**. Lanjutkan.
-3. Pada **Audience**, pilih **Internal** hanya jika semua akun yang akan memakai aplikasi berada dalam organisasi Google Workspace yang sama. Untuk akun pribadi atau pengguna di luar organisasi, pilih **External**.
-4. Isi **Contact Information**, tinjau kebijakan data Google, lalu selesaikan pembuatan konfigurasi.
-5. Jika memilih **External** dan status aplikasi **Testing**, buka **Google Auth Platform → Audience → Test users → Add users**. Tambahkan alamat akun Google yang nanti akan dipakai untuk menghubungkan dokumen, lalu simpan. Akun yang belum terdaftar sebagai test user tidak dapat menyelesaikan persetujuan saat aplikasi masih dalam mode pengujian.
-6. Pada **Data Access**, bila tersedia, tambahkan hanya scope baca Google Docs berikut: `https://www.googleapis.com/auth/documents.readonly`. Jangan pilih scope edit.
+1. Jalankan `.\scripts\start.ps1`, buka `http://localhost:3000`, lalu pilih **Hubungkan Google Docs**.
+2. Pada halaman Google yang terbuka, pilih akun yang terdaftar sebagai test user bila aplikasi masih **External / Testing**. Setujui hanya akses baca Google Docs.
+3. Kembali ke dashboard. Pastikan akun tersebut memiliki akses **Viewer** ke dokumen yang akan dibaca.
+4. Tempel URL Google Docs, misalnya `https://docs.google.com/document/d/ID_DOKUMEN/edit`, atau tempel ID dokumennya saja. Tautan folder Drive dan `drive.google.com/file` bukan URL Google Docs.
+5. Pilih rentang tanggal, lalu periksa hasil pembacaan sebelum menyetujui entri.
 
-Pilihan **Internal** hanya berlaku untuk akun dalam organisasi Workspace tersebut dan dapat dibatasi oleh administrator organisasi. Jika ragu atau memakai akun Gmail pribadi, pilih **External** lalu tambahkan akunmu sebagai test user.
+Token OAuth disimpan lokal di `backend/.local/google-token.json`. Untuk mengganti akun, hentikan aplikasi, hapus file token tersebut, jalankan kembali, lalu hubungkan ulang dari dashboard. Folder `.local` diabaikan Git.
 
-### 4. Buat OAuth client untuk aplikasi desktop
+Parser menerima beberapa variasi header Indonesia dan Inggris serta format tanggal. Jika sebuah template belum dapat dikenali, Logpilot menandai baris untuk ditinjau dan tidak menebak kegiatannya. **Impor PDF/CSV belum tersedia**; sumber yang didukung saat ini adalah Google Docs.
 
-1. Buka **Google Auth Platform → Clients**, lalu pilih **Create Client**.
-2. Pada **Application type**, pilih **Desktop app**. Jangan pilih **Web application**; Logpilot berjalan lokal dan membuka persetujuan Google di browser.
-3. Beri nama, misalnya `Logpilot Windows`, lalu pilih **Create**.
-4. Unduh JSON konfigurasi dari dialog hasil pembuatan atau dari daftar client. Jika unduhan tidak dimulai otomatis, buka client tersebut dan pilih unduh konfigurasi JSON.
+## Aktifkan GroqCloud
 
-### 5. Simpan file konfigurasi pada lokasi yang benar
+GroqCloud dipakai untuk membuat **draf**, bukan untuk menyetujui atau mengirim entri. Fitur lain tetap berjalan tanpa API key.
 
-1. Di dalam folder proyek, buka folder `backend`. Jika belum ada, buat subfolder bernama `.local`.
-2. Pindahkan file JSON yang diunduh ke folder itu dan ubah namanya persis menjadi:
+1. Buat akun di [GroqCloud Console](https://console.groq.com/), lalu buat key pada halaman [API Keys](https://console.groq.com/keys).
+2. Buka `backend/.env` yang dibuat oleh setup. Isi atau perbarui nilai berikut:
 
-       backend/.local/google-oauth-client.json
+   ```ini
+   AI_PROVIDER=groq
+   GROQ_API_KEY=key-dari-groqcloud
+   GROQ_MODEL=openai/gpt-oss-20b
+   ```
 
-3. Pastikan Windows tidak menambahkan ekstensi kedua, seperti `google-oauth-client.json.json`. Jangan mengedit isi JSON atau mengirimkannya ke orang lain.
+3. Ganti `key-dari-groqcloud` dengan key milikmu. Jika ingin memakai model lain, ambil ID-nya dari [daftar model Groq](https://console.groq.com/docs/models) dan ubah `GROQ_MODEL`.
+4. Simpan file, lalu hentikan dan jalankan ulang aplikasi dengan `.\scripts\start.ps1` agar backend membaca konfigurasi baru. Bila proyek pernah disiapkan sebelum Groq dipakai, jalankan `.\scripts\setup.ps1` lagi untuk memperbarui dependensi.
 
-Folder `backend/.local` dan token OAuth di dalamnya diabaikan Git. Jangan unggah atau commit keduanya.
+API key hanya dibaca di backend. Jangan menaruhnya dalam variabel `NEXT_PUBLIC_`, kode frontend, screenshot, atau commit. `backend/.env` diabaikan Git. [Quickstart Groq](https://console.groq.com/docs/quickstart) menjelaskan pembuatan key dan SDK Python.
 
-### 6. Hubungkan akun dari Logpilot
+Di dashboard, tombol **Buat dengan AI** membuat draf hasil dari uraian kegiatan. Editor refleksi mengumpulkan catatan satu minggu Senin sampai Jumat dan menandai hari yang belum lengkap. Tinjau informasi sensitif sebelum membuat draf, lalu periksa, sunting, simpan, dan setujui hasilnya. Logpilot menyamarkan email, nomor telepon, serta nomor berlabel NIM/NPM/NIK/KTP; tautan dokumentasi dan rincian izin tidak dikirim ke GroqCloud.
 
-1. Jalankan setup jika belum pernah dilakukan, lalu mulai aplikasi:
+## Pasang Chrome extension
 
-       .\scripts\setup.ps1
-       .\scripts\start.ps1
+Extension menggunakan sesi Chrome tempat kamu sudah login ke portal. Pairing menghubungkannya dengan backend lokal; kredensial portal tidak dimasukkan ke dashboard.
 
-2. Buka http://localhost:3000 dan pilih **Hubungkan Google Docs**.
-3. Browser akan membuka halaman Google. Pilih akun yang sudah ditambahkan sebagai test user jika aplikasinya berstatus **External / Testing**.
-4. Tinjau permintaan akses dan lanjutkan hanya jika Logpilot meminta akses baca Google Docs. Setelah Google menyatakan koneksi berhasil, kembali ke dashboard.
-5. Tempel URL atau ID Google Docs. Pastikan akun yang terhubung memiliki akses **Viewer** ke dokumen; akses yang hanya diberikan kepada akun Google lain tidak cukup.
-6. Pilih rentang tanggal dan jalankan pemeriksaan. Tanggal tanpa baris akan ditampilkan untuk ditinjau, bukan otomatis dianggap sebagai hari kerja yang terlewat.
+1. Dari folder proyek, buat berkas extension:
 
-Contoh URL yang diterima adalah `https://docs.google.com/document/d/ID_DOKUMEN/edit`. Logpilot juga menerima ID dokumen saja. Tautan folder Drive atau URL `drive.google.com/file` bukan URL dokumen Google Docs.
+   ```powershell
+   npm --prefix frontend run build:extension
+   ```
 
-### Jika koneksi gagal
+2. Buka `chrome://extensions` di Chrome, aktifkan **Developer mode**, pilih **Load unpacked**, lalu pilih folder `extension` dalam repository. Folder yang dipilih harus berisi `manifest.json`.
+3. Jalankan aplikasi dan buka dashboard. Pada panel **Isi logbook di portal**, pilih **Buat kode pairing**.
+4. Buka popup **Logpilot** dari ikon Extensions Chrome, tempel kode, lalu pilih **Hubungkan extension**. Kode berlaku lima menit dan hanya dapat dipakai sekali.
+5. Di Chrome yang sama, buka `https://kampusberdampak.upnvj.ac.id/logbook-harian` dan login sendiri. Biarkan tab portal terbuka selama batch berjalan.
+6. Pada dashboard, periksa sumber dan rentang tanggal. Sunting serta setujui entri yang benar, pilih **Periksa entri yang disetujui**, lalu **Siapkan batch**.
+7. Buka popup Logpilot. Pastikan backend terhubung, pairing aktif, dan panel portal terdeteksi. Pilih **Mulai automation**. Popup boleh ditutup selama batch berjalan; progres juga tampil di dashboard.
 
-- **Google Docs belum disiapkan:** pastikan nama file tepat `backend/.local/google-oauth-client.json`, berada di folder proyek yang benar, dan backend sudah dijalankan.
-- **Akses aplikasi diblokir saat Testing:** periksa **Google Auth Platform → Audience → Test users** dan tambahkan akun yang sedang dipilih di browser.
-- **API tidak diaktifkan atau respons 403:** pastikan **Google Docs API** diaktifkan pada proyek yang sama dengan OAuth client.
-- **Dokumen tidak dapat dibaca:** periksa URL/ID dan pastikan akun yang terhubung dapat membuka dokumen sebagai Viewer.
-- **Ingin menghubungkan ulang atau mengganti akun:** hentikan aplikasi, hapus `backend/.local/google-token.json`, mulai kembali aplikasi, lalu hubungkan lagi dari dashboard.
+Setelah memperbarui kode extension, jalankan lagi `build:extension`, klik **Reload** pada kartu Logpilot di `chrome://extensions`, lalu muat ulang tab portal. Restart backend saja tidak memuat ulang content script Chrome.
 
-Logpilot meminta scope `documents.readonly`. Token persetujuan dibuat otomatis di `backend/.local/google-token.json` pada komputer ini dan tidak masuk Git. Untuk rincian istilah atau tampilan Cloud Console terbaru, lihat [Google Docs API Python quickstart](https://developers.google.com/workspace/docs/api/quickstart/python), [panduan layar persetujuan OAuth](https://developers.google.com/workspace/guides/configure-oauth-consent), dan [panduan mengaktifkan Google Workspace API](https://developers.google.com/workspace/guides/enable-apis).
+Extension hanya mengisi dan menyimpan entri harian yang sudah disetujui. Entri yang sudah sama tidak dikirim dua kali. Jika status setelah Simpan tidak dapat dibuktikan dengan aman, proses berhenti untuk pemeriksaan sebelum ada percobaan lagi. **Tombol penyelesaian logbook tidak pernah dijalankan oleh Logpilot.**
 
-Parser mengenali sejumlah variasi header Indonesia dan Inggris serta beberapa format tanggal. Jika header aktivitas pada sebuah template belum dikenali, baris akan ditandai untuk ditinjau dan tidak ditebak sebagai kegiatan. Pemetaan template yang belum dikenal akan ditambahkan pada fase berikutnya.
+## Jika ada masalah
 
-## Pemeriksaan
+| Gejala | Yang diperiksa |
+| --- | --- |
+| Dashboard tidak terhubung ke backend | Pastikan jendela backend dari `start.ps1` masih berjalan dan port `8000` tidak dipakai aplikasi lain. |
+| Google menolak akses saat aplikasi masih Testing | Tambahkan akun yang dipilih di **Audience → Test users** pada proyek Google Cloud yang sama. |
+| Dokumen tidak terbaca | Periksa ID/URL Google Docs, akses Viewer akun yang terhubung, dan apakah Google Docs API aktif. |
+| Groq menolak key atau model | Periksa `GROQ_API_KEY` dan `GROQ_MODEL` di `backend/.env`, lalu mulai ulang backend. |
+| Groq membatasi permintaan | Tunggu kuota pulih sesuai [batas penggunaan Groq](https://console.groq.com/docs/rate-limits), lalu buat ulang draf. Entri manual tetap dapat dipakai. |
+| Extension masih memakai perilaku lama | Build ulang, **Reload** extension di Chrome, lalu muat ulang tab portal. |
+| Hasil Simpan belum pasti | Periksa tanggal tersebut di portal sebelum memilih hasil pada dashboard. Jangan memulai ulang entri yang mungkin sudah tersimpan. |
 
-Dari folder proyek, jalankan:
+## Pengembangan dan pemeriksaan
 
-    Push-Location backend
-    .\.venv\Scripts\python.exe -m unittest discover -s tests -v
-    Pop-Location
-    npm --prefix frontend run lint
-    npm --prefix frontend run build -- --webpack
+```powershell
+Push-Location backend
+.\.venv\Scripts\python.exe -m unittest discover -s tests -v
+Pop-Location
+npm --prefix frontend run lint
+npm --prefix frontend run build -- --webpack
+npm --prefix frontend run build:extension
+node --test extension/tests/*.test.mjs
+```
 
-Migrasi bisa dijalankan ulang dengan:
-
-    Push-Location backend
-    .\.venv\Scripts\python.exe -m alembic upgrade head
-    Pop-Location
-
-## Batas fitur saat ini
-
-- Pilih tanggal mulai dan akhir sesuai periode masing-masing. Rentang bersifat inklusif; tanggal akhir harus sama dengan atau setelah tanggal mulai. Pilihan cepat tersedia untuk 3 hari dan 1 minggu.
-- Dashboard membaca Google Docs dan hanya menyimpan catatan dalam rentang yang dipilih. Dashboard menunjukkan tanggal yang terisi, kosong, izin/sakit, perlu ditinjau, atau tidak tercantum. Status tidak tercantum perlu dicocokkan dengan jadwal magang karena belum tentu hari kerja.
-- Entri dalam rentang pilihan dapat disunting dan disetujui satu per satu, termasuk entri yang sudah tersimpan di portal. Perubahan pada entri terkirim menghapus persetujuan lokal; setujui ulang sebelum menyiapkan batch revisi. Jam memakai format 24 jam `HH:MM`. Jam dan tautan dokumentasi dapat disimpan sebagai pengaturan bawaan; penerapan ke catatan kosong memerlukan konfirmasi, sedangkan tautan manual per entri tetap dipertahankan.
-- Refleksi Jumat menggunakan data Senin–Jumat, menandai hari tanpa catatan, dan tetap berupa draf sampai diedit serta disetujui pengguna. Teks sensitif umum disamarkan sebelum dikirim ke GroqCloud.
-- Setelah catatan harian disunting dan disetujui, panel **Isi logbook di portal** menampilkan pratinjau tanggal yang siap. Dashboard membuat snapshot batch dari entri yang disetujui; perubahan berikutnya tidak mengubah snapshot tersebut.
-- Chrome extension memakai sesi browser yang sudah kamu buka. Mulai batch dari popup extension, lalu pantau progres dan periksa hasil yang belum pasti di dashboard. Dashboard tidak mengotomasi DOM portal.
-- Extension membandingkan field portal dengan snapshot: data yang sama dilewati tanpa Simpan, sementara perubahan disimpan melalui form revisi yang teridentifikasi. Kegagalan sebelum klik Simpan dapat dicoba lagi setelah ditinjau; hasil Simpan yang ambigu tidak pernah dicoba ulang otomatis.
-- Batch Playwright lama yang berhenti dengan hasil Simpan belum pasti tidak menghalangi tanggal lain. Entri pada tanggal yang belum diperiksa tetap terkunci sampai pengguna mencocokkannya dengan portal.
-- Impor PDF/CSV belum tersedia. Logpilot tidak akan menekan tombol “Selesaikan Logbook Magang”; finalisasi tetap dilakukan manual oleh pengguna.
-
-### Memasang Chrome extension
-
-1. Jalankan `npm --prefix frontend run build:extension` dari folder proyek. Perintah ini membuat berkas JavaScript di `extension/dist/`.
-2. Buka `chrome://extensions` di Chrome, aktifkan **Developer mode**, lalu pilih **Load unpacked**.
-3. Pilih folder `extension` di repository, yaitu folder yang berisi `manifest.json`. Biarkan Chrome tetap membuka extension ini.
-4. Jalankan Logpilot dengan `.\scripts\start.ps1`, lalu buka dashboard di `http://localhost:3000`.
-5. Di panel **Isi logbook di portal**, pilih **Buat kode pairing**. Buka popup Logpilot dari ikon Extensions Chrome, tempel kode tersebut, lalu pilih **Hubungkan extension**. Kode hanya berlaku lima menit dan dapat dipakai satu kali.
-6. Buka `https://kampusberdampak.upnvj.ac.id/logbook-harian` pada Chrome yang sama dan masuk secara manual. Jangan tutup tab portal saat extension bekerja.
-7. Tinjau dan setujui entri pada dashboard, pilih **Periksa entri yang disetujui**, centang konfirmasi, lalu pilih **Siapkan batch**.
-8. Buka popup Logpilot. Pastikan backend terhubung, pairing aktif, dan panel logbook terdeteksi; pilih **Mulai automation** untuk menjalankan batch. Popup dapat ditutup setelah batch mulai.
-9. Pantau progres di popup atau dashboard. Dashboard dapat menjeda/menghentikan batch, memeriksa hasil yang belum pasti, dan menyiapkan ulang entri gagal yang aman. Jalankan batch baru atau retry dari popup extension.
-
-Jika extension baru dipasang atau diperbarui, muat ulang tab portal. Jika Chrome menampilkan error di popup, pastikan backend masih berjalan dan periksa status portal serta pairing. Untuk memasangkan ulang, putuskan extension dari popup terlebih dahulu.
-
-Extension hanya menyimpan entri harian yang disetujui. Pengujian otomatis menggunakan mock dan tidak mengirim entri sungguhan. Penyelesaian/finalisasi logbook tetap manual.
-
-> Migrasi masih bertahap: dependency dan instalasi Chromium Playwright dipertahankan sementara untuk jalur lama. Dashboard kini menyiapkan batch untuk extension; penghapusan jalur lama dilakukan setelah pengujian lintas komponen di Phase 6.
-
-DaisyUI digunakan untuk komponen antarmuka; lihat [komponen DaisyUI](https://daisyui.com/components/) dan [panduan Next.js](https://daisyui.com/docs/install/nextjs/).
+Tes automation memakai mock dan tidak mengirim logbook sungguhan. Struktur proyek: `backend/` untuk API dan database lokal, `frontend/` untuk dashboard, `extension/` untuk Chrome extension, serta `scripts/` untuk setup dan menjalankan aplikasi. Lihat [kebijakan keamanan](docs/SECURITY.md) untuk penanganan kredensial dan data.
