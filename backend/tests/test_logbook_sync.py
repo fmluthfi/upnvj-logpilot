@@ -100,7 +100,7 @@ class LogbookSyncTests(unittest.TestCase):
                 entry.entry_approved = True
                 session.commit()
 
-                blank_source = source_document("")
+                blank_source = source_document("", "")
                 result = persist_source_rows(session, "doc-id", parse_document(blank_source))
 
                 self.assertEqual(result.conflict_count, 1)
@@ -108,6 +108,27 @@ class LogbookSyncTests(unittest.TestCase):
                 self.assertFalse(entry.entry_approved)
                 self.assertEqual(entry.original_activity, "Riset kebutuhan")
                 self.assertEqual(entry.status, "needs_review")
+        finally:
+            engine.dispose()
+
+    def test_switching_from_google_docs_to_upload_reuses_the_daily_entry(self) -> None:
+        engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+        Base.metadata.create_all(engine)
+        try:
+            with Session(engine) as session:
+                persist_source_rows(session, "google-document", parse_document(source_document("Riset kebutuhan")))
+                entry = session.scalar(select(LogbookEntry))
+                entry.entry_approved = True
+                session.commit()
+
+                result = persist_source_rows(
+                    session, "upload:file-name", parse_document(source_document("Menyusun rancangan"))
+                )
+                self.assertEqual((result.created, result.updated), (0, 1))
+                self.assertEqual(len(list(session.scalars(select(LogbookEntry)))), 1)
+                self.assertEqual(entry.source_document_id, "upload:file-name")
+                self.assertFalse(entry.entry_approved)
+                self.assertTrue(entry.source_conflict)
         finally:
             engine.dispose()
 

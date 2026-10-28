@@ -12,7 +12,7 @@ from app.api.docs import SyncRequest, extract_document_id
 from app.db.base import Base
 from app.db.models import LogbookEntry
 from app.db.session import get_db
-from app.main import app
+from app.main import api, app
 
 
 def cell(value: str) -> dict:
@@ -63,7 +63,7 @@ class GoogleDocsApiTests(unittest.TestCase):
             with Session(engine) as session:
                 yield session
 
-        app.dependency_overrides[get_db] = test_db
+        api.dependency_overrides[get_db] = test_db
         try:
             with patch("app.api.docs.get_google_credentials", return_value=object()), patch(
                 "app.api.docs.get_document", return_value=google_document()
@@ -86,7 +86,7 @@ class GoogleDocsApiTests(unittest.TestCase):
                 self.assertEqual(len(entries), 1)
                 self.assertEqual(entries[0].date, date(2026, 10, 20))
         finally:
-            app.dependency_overrides.pop(get_db, None)
+            api.dependency_overrides.pop(get_db, None)
             engine.dispose()
 
 

@@ -4,24 +4,25 @@
 
 <h1 align="center">Logpilot: Otomatisasi Logbook Magang UPNVJ</h1>
 
-<p align="center">Otomatisasi pengisian entri harian dari Google Docs ke portal Kampus Berdampak.</p>
+<p align="center">Otomatisasi pengisian entri harian dari Google Docs, PDF, atau Word ke portal Kampus Berdampak.</p>
 
 <p align="center">
   <a href="#mulai-cepat">Mulai cepat</a> ·
+  <a href="#unggah-pdf-atau-word">Unggah file</a> ·
   <a href="#hubungkan-google-docs">Google Docs</a> ·
   <a href="#aktifkan-groqcloud">GroqCloud</a> ·
   <a href="#pasang-chrome-extension">Chrome extension</a> ·
   <a href="#jika-ada-masalah">Bantuan</a>
 </p>
 
-Logpilot berjalan di komputer pengguna. Setelah catatan Google Docs ditinjau dan disetujui, Chrome extension mengisi serta menyimpan entri harian melalui sesi portal yang sudah dibuka pengguna.
+Logpilot berjalan di komputer pengguna. Setelah catatan sumber ditinjau dan disetujui, Chrome extension mengisi serta menyimpan entri harian melalui sesi portal yang sudah dibuka pengguna.
 
 **Batas penting:** Logpilot tidak menekan tombol **Selesaikan Logbook Magang**. Penyelesaian logbook dilakukan sendiri di portal.
 
 ## Yang bisa dilakukan
 
 - Pilih rentang tanggal sesuai kebutuhan, termasuk beberapa hari atau sebagian dari masa magang. Tanggal mulai dan akhir tidak dibatasi contoh dokumen.
-- Lihat tanggal yang terisi, kosong, izin/sakit, perlu dipetakan, atau tidak ditemukan di dokumen. Tanggal tanpa catatan tetap perlu dicocokkan dengan jadwal magang masing-masing.
+- Baca Google Docs atau unggah PDF dan Word `.docx` tanpa menyiapkan Google Docs API. Lihat tanggal yang terisi, kosong, izin/sakit, perlu dipetakan, atau tidak ditemukan di dokumen.
 - Sunting uraian, hasil, kendala, jam kerja format 24 jam, dan tautan dokumentasi sebelum menyetujui entri. Jam serta tautan dokumentasi dapat disimpan sebagai bawaan; nilai per entri tetap bisa diubah.
 - Buat draf hasil harian dan refleksi mingguan dengan GroqCloud, lalu tinjau dan sunting sebelum digunakan. Refleksi Jumat memakai catatan Senin sampai Jumat pada minggu yang sama, walaupun rentang unggah hanya mencakup sebagian minggu.
 - Siapkan batch dari entri yang disetujui. Extension membandingkan entri yang sudah ada di portal, melewati data yang sama, dan memakai form revisi untuk data yang berubah. Hasil Simpan yang tidak dapat dipastikan dihentikan untuk pemeriksaan; entri tersebut tidak dikirim ulang secara otomatis.
@@ -44,9 +45,10 @@ Setup memasang dependensi Python dan frontend, membuat database SQLite serta mig
 
 Jika PowerShell menolak skrip, jalankan `Set-ExecutionPolicy -Scope Process Bypass` pada terminal yang sama, lalu ulangi setup. Pengaturan itu hanya berlaku untuk proses PowerShell tersebut.
 
-### 2. Siapkan sumber dan AI
+### 2. Pilih sumber catatan dan AI
 
-- Ikuti [panduan Google Docs](#hubungkan-google-docs) untuk membuat OAuth client dan meletakkan file JSON pada lokasi yang benar. Ini diperlukan untuk membaca dokumen sumber.
+- Untuk cara paling singkat, [unggah PDF atau Word](#unggah-pdf-atau-word) langsung dari dashboard. Tidak perlu proyek Google Cloud.
+- Jika catatan disimpan di Google Docs, ikuti [panduan koneksi Google Docs](#hubungkan-google-docs).
 - Ikuti [panduan GroqCloud](#aktifkan-groqcloud) jika ingin membuat draf dengan AI. Tanpa API key, entri tetap dapat ditulis manual.
 
 ### 3. Jalankan aplikasi
@@ -58,6 +60,14 @@ Jika PowerShell menolak skrip, jalankan `Set-ExecutionPolicy -Scope Process Bypa
 Buka **http://localhost:3000**. Skrip membuka jendela backend dan frontend; hentikan keduanya dengan `Ctrl+C`. Backend tersedia di `http://127.0.0.1:8000`, health check di `/api/health`, dan dokumentasi API di `/docs`.
 
 Untuk mengisi portal, lanjutkan ke [pemasangan Chrome extension](#pasang-chrome-extension). Login portal tetap dilakukan secara manual.
+
+## Unggah PDF atau Word
+
+1. Di dashboard, pilih tanggal mulai dan akhir, lalu pilih **Terapkan periode**.
+2. Pada **Sumber logbook → Unggah PDF atau Word**, pilih file `.pdf` atau `.docx` maksimal 10 MB dan tekan **Periksa isi file**. Koneksi Google Docs tidak diperlukan.
+3. Periksa tanggal yang dikenali serta uraian kegiatan. Sunting baris yang kurang tepat sebelum menyetujui entri dan menyiapkan batch.
+
+PDF harus berisi teks yang dapat dipilih; PDF hasil scan berupa gambar belum bisa dibaca karena OCR belum tersedia. Word `.docx` didukung, sedangkan format `.doc` lama belum didukung. Parser membaca tabel dengan berbagai nama kolom dan catatan berbasis tanggal tanpa tabel. File asli tidak disimpan; catatan hasil ekstraksi disimpan di database lokal. Jika sumber berubah, entri yang terdampak perlu ditinjau lagi sebelum dipakai.
 
 ## Hubungkan Google Docs
 
@@ -100,7 +110,7 @@ Google menjelaskan pilihan audience dan test user dalam [panduan OAuth consent](
 
 Token OAuth disimpan lokal di `backend/.local/google-token.json`. Untuk mengganti akun, hentikan aplikasi, hapus file token tersebut, jalankan kembali, lalu hubungkan ulang dari dashboard. Folder `.local` diabaikan Git.
 
-Parser menerima beberapa variasi header Indonesia dan Inggris serta format tanggal. Jika sebuah template belum dapat dikenali, Logpilot menandai baris untuk ditinjau dan tidak menebak kegiatannya. **Impor PDF/CSV belum tersedia**; sumber yang didukung saat ini adalah Google Docs.
+Parser menerima beberapa variasi header Indonesia dan Inggris serta format tanggal. Jika sebuah template belum dapat dikenali, Logpilot menandai baris untuk ditinjau dan tidak menebak kegiatannya. Impor CSV belum tersedia.
 
 ## Aktifkan GroqCloud
 
@@ -150,6 +160,7 @@ Extension hanya mengisi dan menyimpan entri harian yang sudah disetujui. Entri y
 | Dashboard tidak terhubung ke backend | Pastikan jendela backend dari `start.ps1` masih berjalan dan port `8000` tidak dipakai aplikasi lain. |
 | Google menolak akses saat aplikasi masih Testing | Tambahkan akun yang dipilih di **Audience → Test users** pada proyek Google Cloud yang sama. |
 | Dokumen tidak terbaca | Periksa ID/URL Google Docs, akses Viewer akun yang terhubung, dan apakah Google Docs API aktif. |
+| PDF atau Word tidak terbaca | Pastikan file `.pdf` berisi teks atau file Word berformat `.docx`, tidak dilindungi sandi, dan ukurannya paling besar 10 MB. |
 | Groq menolak key atau model | Periksa `GROQ_API_KEY` dan `GROQ_MODEL` di `backend/.env`, lalu mulai ulang backend. |
 | Groq membatasi permintaan | Tunggu kuota pulih sesuai [batas penggunaan Groq](https://console.groq.com/docs/rate-limits), lalu buat ulang draf. Entri manual tetap dapat dipakai. |
 | Extension masih memakai perilaku lama | Build ulang, **Reload** extension di Chrome, lalu muat ulang tab portal. |
