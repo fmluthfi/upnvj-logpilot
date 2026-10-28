@@ -53,3 +53,20 @@ class LogbookSettings(Base):
     id: Mapped[str] = mapped_column(String(16), primary_key=True, default="local")
     default_start_time: Mapped[PyTime | None] = mapped_column(Time)
     default_end_time: Mapped[PyTime | None] = mapped_column(Time)
+    default_documentation_url: Mapped[str | None] = mapped_column(Text)
+
+
+class WeeklyReflection(Base):
+    __tablename__ = "weekly_reflections"
+
+    friday_date: Mapped[PyDate] = mapped_column(Date, primary_key=True)
+    source_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    reflection_text: Mapped[str | None] = mapped_column(Text)
+    approved: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        server_default=func.current_timestamp(),
+        nullable=False,
+    )

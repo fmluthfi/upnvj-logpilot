@@ -1,8 +1,11 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
+import Image from "next/image";
+import Link from "next/link";
 import { API_BASE } from "../lib/api";
 import { EntryPreview } from "../components/entry-preview";
+import { WeeklyReflectionEditor } from "../components/weekly-reflection-editor";
 
 type DocsStatus = {
   configured: boolean;
@@ -288,20 +291,22 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-base-200">
       <header className="border-b border-base-300 bg-base-100">
-        <div className="navbar mx-auto max-w-6xl px-4 sm:px-6">
-          <div className="flex-1 gap-3">
-            <span aria-hidden="true" className="grid size-10 place-items-center rounded-xl bg-primary font-bold text-primary-content">
-              LP
-            </span>
-            <span className="text-lg font-semibold tracking-tight">Logpilot</span>
-          </div>
+        <div className="mx-auto flex h-16 max-w-6xl items-center px-4 sm:px-6">
+          <Link
+            href="/"
+            aria-label="Logpilot, beranda"
+            className="inline-flex items-center gap-2.5 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
+          >
+            <Image src="/logpilot-mark.png" alt="" width={48} height={48} priority className="size-10 object-contain" />
+            <span className="text-xl font-semibold tracking-tight">Logpilot</span>
+          </Link>
         </div>
       </header>
 
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
         <section aria-labelledby="dashboard-title">
           <h1 id="dashboard-title" className="text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">
-            Otomasi pengisian logbook magang
+            Otomasi Pengisian Logbook Magang UPNVJ
           </h1>
           <p className="mt-3 max-w-2xl text-base leading-7 text-base-content/75">
             Siapkan catatan dari Google Docs untuk rentang tanggal yang kamu pilih sebelum mengisi logbook.
@@ -417,7 +422,7 @@ export default function Home() {
                 </button>
               )}
 
-              <form className="space-y-3" onSubmit={syncGoogleDocs}>
+              <form className="grid gap-4" onSubmit={syncGoogleDocs}>
                 <label className="form-control w-full">
                   <span className="label"><span className="label-text font-medium">URL atau ID dokumen</span></span>
                   <input
@@ -453,10 +458,17 @@ export default function Home() {
         </section>
 
         {selectedRange && (
-          <EntryPreview
-            range={{ start: selectedRange.start, end: selectedRange.end }}
-            refreshKey={entriesRefreshKey}
-          />
+          <>
+            <EntryPreview
+              range={{ start: selectedRange.start, end: selectedRange.end }}
+              refreshKey={entriesRefreshKey}
+            />
+            <WeeklyReflectionEditor
+              key={`${selectedRange.start}|${selectedRange.end}`}
+              range={{ start: selectedRange.start, end: selectedRange.end }}
+              refreshKey={entriesRefreshKey}
+            />
+          </>
         )}
 
         {syncResult && (
