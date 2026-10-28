@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 
-from app.services.gemini_service import generate_structured_response, redact_personal_data
+from app.services.ai_service import generate_structured_response, redact_personal_data
 
 
 class ResultDraft(BaseModel):

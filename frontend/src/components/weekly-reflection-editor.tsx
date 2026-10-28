@@ -243,7 +243,7 @@ export function WeeklyReflectionEditor({ range, refreshKey }: Props) {
                         </div>
                       )) : (
                         <p className="text-base-content/65">
-                          {day.status === "leave" ? "Izin atau hari non-kerja tercatat; rinciannya tidak dikirim ke Gemini." : day.status === "missing" ? "Belum ada entri pada sumber." : "Isi entri perlu ditinjau."}
+                          {day.status === "leave" ? "Izin atau hari non-kerja tercatat; rinciannya tidak dikirim ke GroqCloud." : day.status === "missing" ? "Belum ada entri pada sumber." : "Isi entri perlu ditinjau."}
                         </p>
                       )}
                     </div>
@@ -272,18 +272,18 @@ export function WeeklyReflectionEditor({ range, refreshKey }: Props) {
 
               <div className="alert alert-info items-start text-sm leading-6">
                 <p>
-                  Membuat draf mengirim kegiatan, hasil, dan kendala pekan ini ke Gemini. Email, nomor telepon, NIM/NPM/NIK disamarkan; tautan dokumentasi dan rincian izin tidak dikirim. Periksa informasi sensitif lain sebelum lanjut.
+                  Membuat draf mengirim kegiatan, hasil, dan kendala pekan ini ke GroqCloud. Email, nomor telepon, NIM/NPM/NIK disamarkan; tautan dokumentasi dan rincian izin tidak dikirim. Periksa informasi sensitif lain sebelum lanjut.
                 </p>
               </div>
               <label className="label cursor-pointer justify-start gap-3 whitespace-normal">
                 <input type="checkbox" className="checkbox checkbox-primary" checked={privacyConfirmed} onChange={(event) => setPrivacyConfirmed(event.target.checked)} />
-                <span className="label-text text-sm">Saya telah meninjau catatan dan memastikan isinya aman dikirim ke Gemini.</span>
+                <span className="label-text text-sm">Saya telah meninjau catatan dan memastikan isinya aman dikirim ke GroqCloud.</span>
               </label>
 
               {actionError && <p role="alert" className="text-sm text-error">{actionError}</p>}
               <div className="flex flex-wrap items-center gap-2">
                 <button type="button" className="btn btn-primary btn-sm" disabled={!privacyConfirmed || !hasFacts || data.has_conflicts || busy !== ""} onClick={generate}>
-                  {busy === "generate" ? "Membuat draf…" : data.reflection_text && !data.stale ? "Buat ulang draf" : "Buat draf dengan Gemini"}
+                  {busy === "generate" ? "Membuat draf…" : data.reflection_text && !data.stale ? "Buat ulang draf" : "Buat draf dengan GroqCloud"}
                 </button>
                 <button type="button" className="btn btn-outline btn-sm" disabled={!dirty || (data.stale && !sourceReviewed) || busy !== ""} onClick={saveDraft}>
                   {busy === "save" ? "Menyimpan…" : "Simpan draf"}

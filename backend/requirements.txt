@@ -1,6 +1,6 @@
 alembic>=1.14,<2
 fastapi>=0.115,<1
-google-genai>=2,<3
+groq>=1.7,<2
 google-api-python-client>=2.168,<3
 google-auth-httplib2>=0.2,<1
 google-auth-oauthlib>=1.2,<2
