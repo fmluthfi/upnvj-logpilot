@@ -19,7 +19,7 @@ router = APIRouter(prefix="/extension", tags=["Chrome extension"])
 DASHBOARD_ORIGINS = {"http://localhost:3000", "http://127.0.0.1:3000"}
 PAIRING_TTL = timedelta(minutes=5)
 CLAIM_TTL = timedelta(minutes=2)
-LEASE_EXPIRED_AFTER_SAVE = "Lease berakhir setelah upaya Simpan. Periksa portal sebelum mencoba ulang."
+LEASE_EXPIRED_AFTER_SAVE = "Waktu proses Simpan habis. Periksa tanggal ini di portal sebelum mencoba lagi."
 
 
 class PairRequest(BaseModel):

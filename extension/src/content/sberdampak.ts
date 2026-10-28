@@ -47,6 +47,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 async function runClaim(claim: ClaimedEntry) {
+  let saveHeartbeat: ReturnType<typeof setInterval> | undefined;
   try {
     const result = await LogpilotPortalAdapter.run(claim.entry, {
       checkpoint: async (step) => {
@@ -67,6 +68,13 @@ async function runClaim(claim: ClaimedEntry) {
           run_entry_id: claim.run_entry_id,
         });
         if (!response.allowed) throw new Error("Backend belum mengizinkan tombol Simpan.");
+        saveHeartbeat = setInterval(() => {
+          void sendToWorker({
+            type: "SAVE_HEARTBEAT",
+            run_id: claim.run_id,
+            run_entry_id: claim.run_entry_id,
+          }).catch(() => {});
+        }, 20_000);
       },
     });
     activeRunEntryId = null;
@@ -87,6 +95,7 @@ async function runClaim(claim: ClaimedEntry) {
       error: error instanceof Error ? error.message : "Hasil halaman tidak dapat dipastikan. Periksa portal secara manual.",
     }).catch(() => {});
   } finally {
+    if (saveHeartbeat) clearInterval(saveHeartbeat);
     activeRunEntryId = null;
     pendingDirective = "continue";
   }
