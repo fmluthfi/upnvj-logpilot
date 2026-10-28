@@ -53,7 +53,7 @@ GroqCloud membantu membuat draf hasil harian dari uraian kegiatan dan refleksi m
 ### 3. Mulai ulang dan gunakan GroqCloud
 
 1. Tutup jendela aplikasi dengan `Ctrl+C`, lalu jalankan `.\scripts\start.ps1` dari folder proyek agar backend membaca key dan model baru.
-2. Pilih rentang tanggal dan periksa Google Docs. Tombol **Buat dengan AI** mengisi draf Hasil dari uraian kegiatan. Draf belum tersimpan sampai kamu memilih **Simpan perubahan**.
+2. Pilih rentang tanggal dan periksa Google Docs. Tombol **Buat dengan AI** merumuskan hasil yang tersirat langsung dari uraian kegiatan tanpa menambah capaian baru. Draf belum tersimpan sampai kamu memilih **Simpan perubahan**.
 3. Logpilot menyamarkan email, nomor telepon, serta nomor berlabel NIM/NPM/NIK/KTP sebelum mengirim teks. Tautan dokumentasi dan rincian izin tidak dikirim. Tinjau informasi sensitif lain sebelum membuat draf.
 4. Editor refleksi selalu menampilkan satu minggu kerja Senin sampai Jumat, terlepas dari rentang upload yang dipilih. Pilih **Buat draf dengan GroqCloud** untuk membuat atau membuat ulang refleksi. Hari yang belum memiliki entri ditandai agar kamu periksa sebelum menyetujui draf.
 5. Tinjau dan sunting draf, lalu simpan serta setujui setelah isinya benar. Persetujuan menyimpan status refleksi di dashboard. Logpilot tidak mengisi atau mengirim refleksi mingguan ke website.

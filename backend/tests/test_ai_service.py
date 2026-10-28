@@ -172,13 +172,15 @@ class AIPromptTests(unittest.TestCase):
             generate.return_value = ResultDraft(result_text="Hasil ringkas.")
 
             result = generate_result_draft(
-                "Menyusun laporan untuk NIM 12345678 dan mengirimnya ke khaliz@example.com."
+                "Mempelajari dasar WordPress untuk NIM 12345678 dan bertanya ke khaliz@example.com."
             )
 
         self.assertEqual(result, "Hasil ringkas.")
         system_instruction = generate.call_args.kwargs["system_instruction"]
         input_text = generate.call_args.kwargs["input_text"]
-        self.assertIn("Jangan mengarang hasil", system_instruction)
+        self.assertIn("Rumuskan hasil yang dapat disimpulkan langsung dari aktivitas", system_instruction)
+        self.assertIn("memperoleh pemahaman dasar tentang WordPress", system_instruction)
+        self.assertIn("WordPress", input_text)
         self.assertIn("[nomor identitas disamarkan]", input_text)
         self.assertIn("[email disamarkan]", input_text)
         self.assertNotIn("12345678", input_text)
