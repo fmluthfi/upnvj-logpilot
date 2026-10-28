@@ -183,7 +183,7 @@ export function LogbookEntryRow({ entry, onSave, onApprove, onGenerateResult }: 
               <span className="label-text text-xs font-medium">Hasil</span>
               {!isReadOnly && (
                 <button type="button" className="btn btn-ghost btn-xs" disabled={!draft.activity_text.trim() || generatingResult || saving || approving} onClick={generateResult}>
-                  {generatingResult ? "Membuat…" : "Buat dengan Gemini"}
+                  {generatingResult ? "Membuat…" : "Buat dengan AI"}
                 </button>
               )}
             </div>

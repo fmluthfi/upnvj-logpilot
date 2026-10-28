@@ -27,49 +27,50 @@ Skrip membuka terminal backend dan frontend agar log terlihat dan proses dapat d
 
 Jika PowerShell menolak skrip karena execution policy, jalankan `Set-ExecutionPolicy -Scope Process Bypass` di terminal tersebut, lalu ulangi perintah setup. Perubahan ini hanya berlaku pada proses PowerShell yang sedang dibuka.
 
-## Setup Gemini API
+## Setup GroqCloud
 
-Gemini dapat membantu membuat hasil harian dari uraian kegiatan dan draf refleksi mingguan. Tanpa Gemini, semua kolom tetap bisa diisi dan disimpan secara manual.
+GroqCloud membantu membuat draf hasil harian dari uraian kegiatan dan refleksi mingguan. Tanpa API key, semua kolom tetap bisa diisi dan disimpan secara manual.
 
-### 1. Buat API key
+### 1. Buat API key Groq
 
-1. Buka [Google AI Studio API keys](https://aistudio.google.com/apikey) dan masuk ke akun Google.
-2. Pilih proyek Google yang akan dipakai atau buat proyek baru. Setiap API key terikat ke proyek tersebut.
-3. Pilih **Create API key** dan ikuti petunjuk Google. Simpan key sementara di tempat aman; jangan tempelkan ke chat, frontend, atau repository.
-4. Sebelum memilih model, periksa [model Gemini yang tersedia](https://ai.google.dev/gemini-api/docs/models) dan [kuota serta harga](https://ai.google.dev/gemini-api/docs/pricing). Pilih model yang tersedia untuk proyekmu dan mendukung output JSON terstruktur. Status gratis, kuota, dan harga dapat berubah; jangan menganggap model tertentu selalu gratis.
+1. Masuk atau buat akun di [GroqCloud Console](https://console.groq.com/).
+2. Buka [API Keys](https://console.groq.com/keys), buat key, lalu salin dan simpan di tempat aman. Jangan kirim key melalui chat atau memasukkannya ke frontend maupun repository.
+3. Periksa [model yang tersedia](https://console.groq.com/docs/models) dan [batas penggunaan](https://console.groq.com/docs/rate-limits) di Console Groq. Model bawaan Logpilot adalah `openai/gpt-oss-20b` dan bisa diganti lewat konfigurasi.
 
-### 2. Masukkan key dan model ke konfigurasi lokal
+### 2. Simpan konfigurasi di backend
 
-1. Jalankan setup proyek jika `backend/.env` belum dibuat. Setup menyalin `backend/.env.example` secara otomatis.
-2. Buka `backend/.env` dengan editor teks. Isi kedua nilai berikut tanpa tanda kutip:
+1. Jalankan `.\scripts\setup.ps1` dari folder proyek jika `backend/.env` belum dibuat. Setup menyalin `backend/.env.example` dan memasang Groq Python SDK.
+2. Buka `backend/.env` dengan editor teks, lalu isi:
 
-       GEMINI_API_KEY=key-dari-google-ai-studio
-       GEMINI_MODEL=id-model-tepat-dari-dokumentasi-google
+       AI_PROVIDER=groq
+       GROQ_API_KEY=key-dari-groqcloud
+       GROQ_MODEL=openai/gpt-oss-20b
 
-3. Ganti nilai contoh dengan API key dan ID model yang persis, misalnya nama model dari kolom ID di halaman model. Jangan menambahkan `models/` di depan ID.
-4. Simpan file. `.env` berada di folder `backend`, bukan `frontend`; file ini diabaikan Git.
-5. Jika proyek sudah disiapkan sebelum fitur Gemini ditambahkan, jalankan ulang `.\scripts\setup.ps1` dari folder proyek. Langkah ini memasang pustaka Gemini dan menerapkan migrasi database terbaru.
+3. Ganti `key-dari-groqcloud` dengan key yang kamu buat. Untuk memakai model lain, isi `GROQ_MODEL` dengan ID model dari GroqCloud.
+4. Simpan file. Konfigurasi berada di folder `backend`, tidak perlu variabel `NEXT_PUBLIC_`, dan `.env` diabaikan Git.
+5. Jika proyek sudah disiapkan sebelumnya, jalankan ulang `.\scripts\setup.ps1` agar dependensi backend diperbarui.
 
-### 3. Mulai ulang dan gunakan Gemini
+### 3. Mulai ulang dan gunakan GroqCloud
 
-1. Tutup jendela aplikasi yang sedang berjalan dengan `Ctrl+C`, lalu jalankan kembali `.\scripts\start.ps1` dari folder proyek agar backend membaca konfigurasi terbaru.
-2. Di dashboard, pilih rentang tanggal lalu periksa Google Docs seperti biasa. Pilih **Buat hasil dengan Gemini** pada kolom Hasil untuk mengisi draf dari uraian kegiatan. Hasil tampil di kolom dan belum tersimpan sampai kamu memilih **Simpan perubahan**.
-3. Tinjau catatan yang ditampilkan. Saat membuat hasil atau refleksi, Logpilot menyamarkan email, nomor telepon, serta nomor berlabel NIM/NPM/NIK/KTP. Tautan dokumentasi dan rincian izin tidak dikirim.
-4. Editor refleksi menampilkan semua hari Senin sampai Jumat dari pekan yang dipilih, termasuk tanggal tanpa catatan. Periksa informasi sensitif lain secara manual, centang konfirmasi keamanan data, lalu pilih **Buat draf dengan Gemini**.
-5. Periksa dan sunting semua teks yang dibuat. Pilih **Simpan perubahan** atau **Simpan draf** agar tersimpan, lalu setujui setelah isinya benar. Persetujuan tidak mengirim catatan ke portal.
+1. Tutup jendela aplikasi dengan `Ctrl+C`, lalu jalankan `.\scripts\start.ps1` dari folder proyek agar backend membaca key dan model baru.
+2. Pilih rentang tanggal dan periksa Google Docs. Tombol **Buat dengan AI** merumuskan hasil yang tersirat langsung dari uraian kegiatan tanpa menambah capaian baru. Draf belum tersimpan sampai kamu memilih **Simpan perubahan**.
+3. Logpilot menyamarkan email, nomor telepon, serta nomor berlabel NIM/NPM/NIK/KTP sebelum mengirim teks. Tautan dokumentasi dan rincian izin tidak dikirim. Tinjau informasi sensitif lain sebelum membuat draf.
+4. Editor refleksi selalu menampilkan satu minggu kerja Senin sampai Jumat, terlepas dari rentang upload yang dipilih. Pilih **Buat draf dengan GroqCloud** untuk membuat atau membuat ulang refleksi. Hari yang belum memiliki entri ditandai agar kamu periksa sebelum menyetujui draf.
+5. Tinjau dan sunting draf, lalu simpan serta setujui setelah isinya benar. Persetujuan menyimpan status refleksi di dashboard. Logpilot tidak mengisi atau mengirim refleksi mingguan ke website.
 
-Jika key atau model belum diisi, hasil dan refleksi tetap bisa ditulis manual. API key hanya dibaca backend dari `backend/.env`; jangan menaruh key di kode frontend, README, screenshot, atau commit Git.
+API key hanya dibaca backend dari `backend/.env`. Jangan menaruh key di kode frontend, file README, screenshot, atau commit Git. Tanpa key yang valid, penggunaan AI menampilkan pesan yang dapat ditindaklanjuti; fitur dashboard lain tetap bisa digunakan.
 
-### Jika Gemini gagal
+### Jika GroqCloud gagal
 
-- **Konfigurasi belum lengkap:** pastikan `GEMINI_API_KEY` dan `GEMINI_MODEL` tidak kosong di `backend/.env`, lalu mulai ulang aplikasi.
-- **Pustaka Gemini belum terpasang:** jalankan ulang `.\scripts\setup.ps1` dari folder proyek, lalu mulai ulang aplikasi. Pesan API akan menyebutkan langkah ini jika `google-genai` belum tersedia.
-- **Key ditolak:** pastikan key aktif dan berasal dari proyek Google AI Studio yang benar. Buat key baru jika key lama sudah dihapus atau dinonaktifkan.
-- **Model tidak tersedia atau format tidak didukung:** salin ID model tepat dari dokumentasi Google dan pilih model yang mendukung output JSON terstruktur.
-- **Kuota habis atau permintaan dibatasi:** periksa penggunaan, kuota, dan ketentuan biaya proyek di Google AI Studio. Tunggu kuota pulih atau pilih konfigurasi yang sesuai; Logpilot tidak akan mengirim ulang refleksi secara otomatis.
-- **Refleksi lama tidak cocok dengan catatan terbaru:** tinjau perubahan sumber, buat draf baru, atau sunting draf secara manual sebelum menyetujui.
+- **API key belum diatur:** isi `GROQ_API_KEY` di `backend/.env`, lalu mulai ulang aplikasi.
+- **API key ditolak:** pastikan key masih aktif dan tidak memiliki spasi atau tanda kutip tambahan.
+- **Batas penggunaan tercapai:** dashboard menampilkan pesan batas penggunaan. SDK mencoba ulang kegagalan sementara hingga dua kali dengan jeda bertambah; setelah itu tunggu batas pulih sebelum membuat draf lagi.
+- **Model tidak tersedia:** periksa ejaan `GROQ_MODEL` dan pilih ID model aktif di GroqCloud.
+- **Koneksi atau waktu tunggu:** periksa koneksi internet, lalu coba buat ulang draf.
+- **Jawaban kosong atau tidak sesuai:** periksa catatan sumber, lalu buat ulang atau tulis draf secara manual.
+- **Refleksi tidak sesuai dengan catatan terbaru:** tinjau perubahan sumber, buat draf baru, atau sunting draf sebelum menyetujuinya.
 
-Integrasi memakai Google Gen AI SDK di backend melalui Interactions API dan meminta keluaran JSON terstruktur agar hasil bisa divalidasi sebelum disimpan. Lihat [panduan memulai Python](https://ai.google.dev/gemini-api/docs/get-started?lang=python), [format keluaran terstruktur](https://ai.google.dev/gemini-api/docs/structured-output), dan [penggunaan API key](https://ai.google.dev/gemini-api/docs/api-key).
+Integrasi menggunakan [Groq Python SDK](https://github.com/groq/groq-python) dari backend dan memvalidasi keluaran JSON sebelum menyimpan draf. Lihat [panduan Groq](https://console.groq.com/docs/quickstart), [Structured Outputs](https://console.groq.com/docs/structured-outputs), dan [penanganan error SDK](https://github.com/groq/groq-python#handling-errors).
 
 ## Setup Google Docs
 
@@ -164,7 +165,7 @@ Migrasi bisa dijalankan ulang dengan:
 - Pilih tanggal mulai dan akhir sesuai periode masing-masing. Rentang bersifat inklusif; tanggal akhir harus sama dengan atau setelah tanggal mulai. Pilihan cepat tersedia untuk 3 hari dan 1 minggu.
 - Dashboard membaca Google Docs dan hanya menyimpan catatan dalam rentang yang dipilih. Dashboard menunjukkan tanggal yang terisi, kosong, izin/sakit, perlu ditinjau, atau tidak tercantum. Status tidak tercantum perlu dicocokkan dengan jadwal magang karena belum tentu hari kerja.
 - Entri dalam rentang pilihan dapat disunting dan disetujui satu per satu. Jam memakai format 24 jam `HH:MM`. Jam dan tautan dokumentasi dapat disimpan sebagai pengaturan bawaan; penerapan ke catatan kosong memerlukan konfirmasi, sedangkan tautan manual per entri tetap dipertahankan.
-- Refleksi Jumat menggunakan data Senin–Jumat, menandai hari tanpa catatan, dan tetap berupa draf sampai diedit serta disetujui pengguna. Teks sensitif umum disamarkan sebelum dikirim ke Gemini.
+- Refleksi Jumat menggunakan data Senin–Jumat, menandai hari tanpa catatan, dan tetap berupa draf sampai diedit serta disetujui pengguna. Teks sensitif umum disamarkan sebelum dikirim ke GroqCloud.
 - Impor CSV/PDF dan pengiriman entri ke portal belum tersedia. Otomasi tidak akan pernah menekan tombol “Selesaikan Logbook Magang”.
 
 DaisyUI digunakan untuk komponen antarmuka; lihat [komponen DaisyUI](https://daisyui.com/components/) dan [panduan Next.js](https://daisyui.com/docs/install/nextjs/).

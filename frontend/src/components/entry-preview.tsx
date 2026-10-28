@@ -110,7 +110,7 @@ export function EntryPreview({ range, refreshKey }: Props) {
           <div>
             <h2 id="entries-title" className="card-title text-xl">Pratinjau dan persetujuan</h2>
             <p className="mt-1 text-sm leading-6 text-base-content/70">
-              Sunting entri dan setujui satu per satu. Uraian dikirim ke Gemini setelah penyamaran data umum; periksa hasilnya lalu simpan.
+              Sunting entri dan setujui satu per satu. Uraian dikirim ke GroqCloud setelah penyamaran data umum; periksa hasilnya lalu simpan.
             </p>
             <p className="mt-1 text-sm text-base-content/65">{formatDate(range.start)} — {formatDate(range.end)}</p>
           </div>

@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.db.models import LogbookEntry, LogbookSettings
 from app.db.session import get_db
-from app.services.gemini_service import GeminiServiceError
+from app.services.ai_service import AIServiceError
 from app.services.result_service import generate_result_draft
 
 
@@ -107,7 +107,7 @@ def generate_entry_result(
 
     try:
         return {"result_text": generate_result_draft(request.activity_text.strip())}
-    except GeminiServiceError as error:
+    except AIServiceError as error:
         raise HTTPException(status_code=error.status_code, detail=error.detail) from error
 
 
