@@ -4,7 +4,7 @@ from datetime import date
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.db.models import LogbookEntry
+from app.db.models import LogbookEntry, LogbookSettings
 from app.services.google_docs_parser import ParsedLogbookRow
 
 
@@ -32,6 +32,8 @@ def persist_source_rows(
     created = updated = unchanged = 0
     conflicts: set[int] = set()
     statuses = {"filled": "draft", "leave": "skipped", "needs_mapping": "needs_review"}
+    settings = session.get(LogbookSettings, "local")
+    default_documentation_url = settings.default_documentation_url if settings else None
 
     statement = select(LogbookEntry).where(LogbookEntry.source_document_id == document_id)
     if start_date is not None and end_date is not None:
@@ -71,7 +73,11 @@ def persist_source_rows(
                     original_activity=row.original_activity,
                     result_text=row.result_text,
                     obstacle_text=row.obstacle_text,
-                    documentation_url=row.documentation_url,
+                    documentation_url=(
+                        row.documentation_url or default_documentation_url
+                        if row.kind == "filled"
+                        else row.documentation_url
+                    ),
                     status=statuses[row.kind],
                     last_error=_row_note(row.kind),
                 )
@@ -93,7 +99,11 @@ def persist_source_rows(
         existing.original_activity = row.original_activity
         existing.result_text = row.result_text
         existing.obstacle_text = row.obstacle_text
-        existing.documentation_url = row.documentation_url
+        existing.documentation_url = (
+            row.documentation_url or existing.documentation_url or default_documentation_url
+            if row.kind == "filled"
+            else row.documentation_url
+        )
         existing.source_payload_json = row.source_payload_json
         existing.source_hash = row.source_hash
         existing.source_conflict = True

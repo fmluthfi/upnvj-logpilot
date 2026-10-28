@@ -29,16 +29,47 @@ Jika PowerShell menolak skrip karena execution policy, jalankan `Set-ExecutionPo
 
 ## Setup Gemini API
 
-1. Buat atau pilih API key melalui [Google AI Studio](https://aistudio.google.com/apikey). Ikuti petunjuk autentikasi key Google jika proyek meminta langkah tambahan.
-2. Buka `backend/.env` dan isi:
+Gemini dapat membantu membuat hasil harian dari uraian kegiatan dan draf refleksi mingguan. Tanpa Gemini, semua kolom tetap bisa diisi dan disimpan secara manual.
+
+### 1. Buat API key
+
+1. Buka [Google AI Studio API keys](https://aistudio.google.com/apikey) dan masuk ke akun Google.
+2. Pilih proyek Google yang akan dipakai atau buat proyek baru. Setiap API key terikat ke proyek tersebut.
+3. Pilih **Create API key** dan ikuti petunjuk Google. Simpan key sementara di tempat aman; jangan tempelkan ke chat, frontend, atau repository.
+4. Sebelum memilih model, periksa [model Gemini yang tersedia](https://ai.google.dev/gemini-api/docs/models) dan [kuota serta harga](https://ai.google.dev/gemini-api/docs/pricing). Pilih model yang tersedia untuk proyekmu dan mendukung output JSON terstruktur. Status gratis, kuota, dan harga dapat berubah; jangan menganggap model tertentu selalu gratis.
+
+### 2. Masukkan key dan model ke konfigurasi lokal
+
+1. Jalankan setup proyek jika `backend/.env` belum dibuat. Setup menyalin `backend/.env.example` secara otomatis.
+2. Buka `backend/.env` dengan editor teks. Isi kedua nilai berikut tanpa tanda kutip:
 
        GEMINI_API_KEY=key-dari-google-ai-studio
-       GEMINI_MODEL=model-id-yang-tersedia
+       GEMINI_MODEL=id-model-tepat-dari-dokumentasi-google
 
-3. Pilih `GEMINI_MODEL` dari [daftar model Gemini API](https://ai.google.dev/gemini-api/docs/models). Ketersediaan model, kuota, dan biaya dapat berbeda menurut proyek dan berubah dari waktu ke waktu; periksa informasi terbaru di AI Studio sebelum memilih.
-4. Simpan key hanya di `backend/.env`. Jangan menaruhnya di kode frontend, README, screenshot, atau commit Git. File `.env` diabaikan Git.
+3. Ganti nilai contoh dengan API key dan ID model yang persis, misalnya nama model dari kolom ID di halaman model. Jangan menambahkan `models/` di depan ID.
+4. Simpan file. `.env` berada di folder `backend`, bukan `frontend`; file ini diabaikan Git.
+5. Jika proyek sudah disiapkan sebelum fitur Gemini ditambahkan, jalankan ulang `.\scripts\setup.ps1` dari folder proyek. Langkah ini memasang pustaka Gemini dan menerapkan migrasi database terbaru.
 
-Saat ini aplikasi belum mengirim permintaan ke Gemini; key boleh dibiarkan kosong dan tidak dibutuhkan untuk menjalankan dashboard. Integrasi refleksi Gemini direncanakan pada Phase 4. Backend akan menjadi satu-satunya bagian aplikasi yang membaca key.
+### 3. Mulai ulang dan gunakan Gemini
+
+1. Tutup jendela aplikasi yang sedang berjalan dengan `Ctrl+C`, lalu jalankan kembali `.\scripts\start.ps1` dari folder proyek agar backend membaca konfigurasi terbaru.
+2. Di dashboard, pilih rentang tanggal lalu periksa Google Docs seperti biasa. Pilih **Buat hasil dengan Gemini** pada kolom Hasil untuk mengisi draf dari uraian kegiatan. Hasil tampil di kolom dan belum tersimpan sampai kamu memilih **Simpan perubahan**.
+3. Tinjau catatan yang ditampilkan. Saat membuat hasil atau refleksi, Logpilot menyamarkan email, nomor telepon, serta nomor berlabel NIM/NPM/NIK/KTP. Tautan dokumentasi dan rincian izin tidak dikirim.
+4. Editor refleksi menampilkan semua hari Senin sampai Jumat dari pekan yang dipilih, termasuk tanggal tanpa catatan. Periksa informasi sensitif lain secara manual, centang konfirmasi keamanan data, lalu pilih **Buat draf dengan Gemini**.
+5. Periksa dan sunting semua teks yang dibuat. Pilih **Simpan perubahan** atau **Simpan draf** agar tersimpan, lalu setujui setelah isinya benar. Persetujuan tidak mengirim catatan ke portal.
+
+Jika key atau model belum diisi, hasil dan refleksi tetap bisa ditulis manual. API key hanya dibaca backend dari `backend/.env`; jangan menaruh key di kode frontend, README, screenshot, atau commit Git.
+
+### Jika Gemini gagal
+
+- **Konfigurasi belum lengkap:** pastikan `GEMINI_API_KEY` dan `GEMINI_MODEL` tidak kosong di `backend/.env`, lalu mulai ulang aplikasi.
+- **Pustaka Gemini belum terpasang:** jalankan ulang `.\scripts\setup.ps1` dari folder proyek, lalu mulai ulang aplikasi. Pesan API akan menyebutkan langkah ini jika `google-genai` belum tersedia.
+- **Key ditolak:** pastikan key aktif dan berasal dari proyek Google AI Studio yang benar. Buat key baru jika key lama sudah dihapus atau dinonaktifkan.
+- **Model tidak tersedia atau format tidak didukung:** salin ID model tepat dari dokumentasi Google dan pilih model yang mendukung output JSON terstruktur.
+- **Kuota habis atau permintaan dibatasi:** periksa penggunaan, kuota, dan ketentuan biaya proyek di Google AI Studio. Tunggu kuota pulih atau pilih konfigurasi yang sesuai; Logpilot tidak akan mengirim ulang refleksi secara otomatis.
+- **Refleksi lama tidak cocok dengan catatan terbaru:** tinjau perubahan sumber, buat draf baru, atau sunting draf secara manual sebelum menyetujui.
+
+Integrasi memakai Google Gen AI SDK di backend melalui Interactions API dan meminta keluaran JSON terstruktur agar hasil bisa divalidasi sebelum disimpan. Lihat [panduan memulai Python](https://ai.google.dev/gemini-api/docs/get-started?lang=python), [format keluaran terstruktur](https://ai.google.dev/gemini-api/docs/structured-output), dan [penggunaan API key](https://ai.google.dev/gemini-api/docs/api-key).
 
 ## Setup Google Docs
 
@@ -132,7 +163,8 @@ Migrasi bisa dijalankan ulang dengan:
 
 - Pilih tanggal mulai dan akhir sesuai periode masing-masing. Rentang bersifat inklusif; tanggal akhir harus sama dengan atau setelah tanggal mulai. Pilihan cepat tersedia untuk 3 hari dan 1 minggu.
 - Dashboard membaca Google Docs dan hanya menyimpan catatan dalam rentang yang dipilih. Dashboard menunjukkan tanggal yang terisi, kosong, izin/sakit, perlu ditinjau, atau tidak tercantum. Status tidak tercantum perlu dicocokkan dengan jadwal magang karena belum tentu hari kerja.
-- Entri dalam rentang pilihan dapat disunting dan disetujui satu per satu. Jam bawaan hanya diterapkan setelah pengguna meninjau jumlah entri dan mengonfirmasi penerapannya. Persetujuan ini belum mengirim catatan ke portal.
+- Entri dalam rentang pilihan dapat disunting dan disetujui satu per satu. Jam memakai format 24 jam `HH:MM`. Jam dan tautan dokumentasi dapat disimpan sebagai pengaturan bawaan; penerapan ke catatan kosong memerlukan konfirmasi, sedangkan tautan manual per entri tetap dipertahankan.
+- Refleksi Jumat menggunakan data Senin–Jumat, menandai hari tanpa catatan, dan tetap berupa draf sampai diedit serta disetujui pengguna. Teks sensitif umum disamarkan sebelum dikirim ke Gemini.
 - Impor CSV/PDF dan pengiriman entri ke portal belum tersedia. Otomasi tidak akan pernah menekan tombol “Selesaikan Logbook Magang”.
 
 DaisyUI digunakan untuk komponen antarmuka; lihat [komponen DaisyUI](https://daisyui.com/components/) dan [panduan Next.js](https://daisyui.com/docs/install/nextjs/).

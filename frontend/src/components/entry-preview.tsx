@@ -76,11 +76,30 @@ export function EntryPreview({ range, refreshKey }: Props) {
     return updated;
   }
 
+  async function generateResult(entryId: string, activityText: string) {
+    const response = await fetch(`${API_BASE}/entries/${entryId}/generate-result`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ activity_text: activityText }),
+    });
+    if (!response.ok) throw new Error(await apiError(response, "Hasil belum dapat dibuat."));
+    const result = await response.json() as { result_text: string };
+    return result.result_text;
+  }
+
   const eligibleCount = entries.filter((entry) =>
     entry.status === "draft"
+      && !entry.entry_approved
       && !entry.source_conflict
       && !entry.start_time
       && !entry.end_time
+      && Boolean((entry.activity_text ?? entry.original_activity ?? "").trim()),
+  ).length;
+  const documentationEligibleCount = entries.filter((entry) =>
+    entry.status === "draft"
+      && !entry.source_conflict
+      && !entry.entry_approved
+      && !entry.documentation_url?.trim()
       && Boolean((entry.activity_text ?? entry.original_activity ?? "").trim()),
   ).length;
 
@@ -91,7 +110,7 @@ export function EntryPreview({ range, refreshKey }: Props) {
           <div>
             <h2 id="entries-title" className="card-title text-xl">Pratinjau dan persetujuan</h2>
             <p className="mt-1 text-sm leading-6 text-base-content/70">
-              Sunting setiap entri, lengkapi jam, lalu setujui secara terpisah.
+              Sunting entri dan setujui satu per satu. Uraian dikirim ke Gemini setelah penyamaran data umum; periksa hasilnya lalu simpan.
             </p>
             <p className="mt-1 text-sm text-base-content/65">{formatDate(range.start)} — {formatDate(range.end)}</p>
           </div>
@@ -100,6 +119,7 @@ export function EntryPreview({ range, refreshKey }: Props) {
             key={`${range.start}|${range.end}`}
             range={range}
             eligibleCount={eligibleCount}
+            documentationEligibleCount={documentationEligibleCount}
             onApplied={async () => setRevision((current) => current + 1)}
           />
 
@@ -114,17 +134,10 @@ export function EntryPreview({ range, refreshKey }: Props) {
               Belum ada entri tersimpan pada rentang ini. Hubungkan Google Docs dan periksa periode untuk memuat catatan.
             </p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="table table-zebra min-w-[78rem]">
-                <thead>
-                  <tr><th>Tanggal</th><th>Isi entri</th><th>Jam dan dokumentasi</th><th>Persetujuan</th></tr>
-                </thead>
-                <tbody>
-                  {entries.map((entry) => (
-                    <LogbookEntryRow key={entry.id} entry={entry} onSave={save} onApprove={approve} />
-                  ))}
-                </tbody>
-              </table>
+            <div className="divide-y divide-base-300">
+              {entries.map((entry) => (
+                <LogbookEntryRow key={entry.id} entry={entry} onSave={save} onApprove={approve} onGenerateResult={generateResult} />
+              ))}
             </div>
           )}
         </div>

@@ -8,6 +8,8 @@ from sqlalchemy.orm import Session
 
 from app.db.models import LogbookEntry, LogbookSettings
 from app.db.session import get_db
+from app.services.gemini_service import GeminiServiceError
+from app.services.result_service import generate_result_draft
 
 
 router = APIRouter(prefix="/entries", tags=["Logbook entries"])
@@ -44,9 +46,10 @@ class EntryPatch(BaseModel):
         return self
 
 
-class DefaultHours(BaseModel):
+class DefaultSettings(BaseModel):
     default_start_time: time | None = None
     default_end_time: time | None = None
+    default_documentation_url: str | None = Field(default=None, max_length=2048)
 
     @model_validator(mode="after")
     def validate_hours(self):
@@ -61,8 +64,20 @@ class DefaultHours(BaseModel):
         return self
 
 
-class ApplyDefaultHours(DateRange):
+class ApplyDefaults(DateRange):
     confirmed: bool
+    apply_hours: bool = True
+    apply_documentation: bool = False
+
+    @model_validator(mode="after")
+    def validate_apply_fields(self):
+        if not self.apply_hours and not self.apply_documentation:
+            raise ValueError("Pilih jam kerja atau dokumentasi yang akan diterapkan.")
+        return self
+
+
+class GenerateResultRequest(BaseModel):
+    activity_text: str = Field(min_length=1, max_length=10000)
 
 
 @router.get("")
@@ -74,6 +89,26 @@ def list_entries(start: date, end: date, session: Session = Depends(get_db)) -> 
         .order_by(LogbookEntry.date, LogbookEntry.created_at)
     )
     return [_entry_payload(entry) for entry in entries]
+
+
+@router.post("/{entry_id}/generate-result")
+def generate_entry_result(
+    entry_id: str,
+    request: GenerateResultRequest,
+    session: Session = Depends(get_db),
+) -> dict[str, str]:
+    entry = _find_entry(session, entry_id)
+    if entry.status in {"skipped", "processing", "submitted", "verification_needed"} or entry.portal_entry_id:
+        raise HTTPException(status_code=409, detail="Catatan ini tidak dapat dibuatkan hasil.")
+    if entry.source_conflict:
+        raise HTTPException(status_code=409, detail="Tinjau perubahan sumber sebelum membuat hasil.")
+    if not request.activity_text.strip():
+        raise HTTPException(status_code=422, detail="Uraian kegiatan perlu diisi sebelum membuat hasil.")
+
+    try:
+        return {"result_text": generate_result_draft(request.activity_text.strip())}
+    except GeminiServiceError as error:
+        raise HTTPException(status_code=error.status_code, detail=error.detail) from error
 
 
 @router.patch("/{entry_id}")
@@ -152,13 +187,16 @@ def get_default_hours(session: Session = Depends(get_db)) -> dict:
 
 
 @router.put("/default-hours")
-def save_default_hours(hours: DefaultHours, session: Session = Depends(get_db)) -> dict:
+def save_default_hours(hours: DefaultSettings, session: Session = Depends(get_db)) -> dict:
+    documentation_url = _validate_documentation_url(hours.default_documentation_url)
     settings = session.get(LogbookSettings, "local")
     if settings is None:
         settings = LogbookSettings(id="local")
         session.add(settings)
     settings.default_start_time = hours.default_start_time
     settings.default_end_time = hours.default_end_time
+    if "default_documentation_url" in hours.model_fields_set:
+        settings.default_documentation_url = documentation_url
     session.commit()
     session.refresh(settings)
     return _hours_payload(settings)
@@ -166,37 +204,44 @@ def save_default_hours(hours: DefaultHours, session: Session = Depends(get_db)) 
 
 @router.post("/default-hours/apply")
 def apply_default_hours(
-    request: ApplyDefaultHours,
+    request: ApplyDefaults,
     session: Session = Depends(get_db),
 ) -> dict[str, int]:
     _validate_range(request.start, request.end)
     if not request.confirmed:
-        raise HTTPException(status_code=422, detail="Konfirmasi penerapan jam diperlukan.")
+        raise HTTPException(status_code=422, detail="Konfirmasi penerapan pengaturan diperlukan.")
 
     settings = session.get(LogbookSettings, "local")
-    if not settings or settings.default_start_time is None or settings.default_end_time is None:
+    if not settings:
+        raise HTTPException(status_code=409, detail="Simpan pengaturan bawaan terlebih dahulu.")
+    if request.apply_hours and (settings.default_start_time is None or settings.default_end_time is None):
         raise HTTPException(status_code=409, detail="Simpan jam kerja bawaan terlebih dahulu.")
+    if request.apply_documentation and not settings.default_documentation_url:
+        raise HTTPException(status_code=409, detail="Simpan tautan dokumentasi bawaan terlebih dahulu.")
 
-    entries = session.scalars(
+    entries = list(session.scalars(
         select(LogbookEntry).where(
             LogbookEntry.date.between(request.start, request.end),
             LogbookEntry.status == "draft",
             LogbookEntry.entry_approved.is_(False),
             LogbookEntry.source_conflict.is_(False),
-            LogbookEntry.start_time.is_(None),
-            LogbookEntry.end_time.is_(None),
         )
-    )
-    updated = 0
+    ))
+    hours_updated = 0
+    documentation_updated = 0
     for entry in entries:
         if not (entry.activity_text or entry.original_activity or "").strip():
             continue
-        entry.start_time = settings.default_start_time
-        entry.end_time = settings.default_end_time
-        updated += 1
+        if request.apply_hours and entry.start_time is None and entry.end_time is None:
+            entry.start_time = settings.default_start_time
+            entry.end_time = settings.default_end_time
+            hours_updated += 1
+        if request.apply_documentation and not (entry.documentation_url or "").strip():
+            entry.documentation_url = settings.default_documentation_url
+            documentation_updated += 1
 
     session.commit()
-    return {"updated": updated}
+    return {"updated": hours_updated, "documentation_updated": documentation_updated}
 
 
 def _validate_range(start: date, end: date) -> None:
@@ -243,6 +288,7 @@ def _hours_payload(settings: LogbookSettings | None) -> dict:
     return {
         "default_start_time": _time_string(settings.default_start_time) if settings else None,
         "default_end_time": _time_string(settings.default_end_time) if settings else None,
+        "default_documentation_url": settings.default_documentation_url if settings else None,
     }
 
 
