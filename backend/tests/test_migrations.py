@@ -39,13 +39,18 @@ class MigrationTests(unittest.TestCase):
                     }.issubset(columns)
                 )
                 self.assertTrue(
-                    {"id", "start_date", "end_date", "status", "total_entries", "stop_requested"}.issubset(
+                    {"id", "start_date", "end_date", "runner", "status", "total_entries", "stop_requested", "pause_requested"}.issubset(
                         {column["name"] for column in inspector.get_columns("automation_runs")}
                     )
                 )
                 self.assertTrue(
-                    {"id", "run_id", "entry_id", "status", "save_attempted", "safe_to_retry"}.issubset(
+                    {"id", "run_id", "entry_id", "status", "save_attempted", "safe_to_retry", "snapshot_json", "claimed_by", "lease_expires_at"}.issubset(
                         {column["name"] for column in inspector.get_columns("automation_run_entries")}
+                    )
+                )
+                self.assertTrue(
+                    {"extension_pairing_code_hash", "extension_pairing_expires_at", "extension_token_hash", "extension_token_created_at"}.issubset(
+                        {column["name"] for column in inspector.get_columns("logbook_settings")}
                     )
                 )
             finally:

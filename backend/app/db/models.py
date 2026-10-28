@@ -54,6 +54,10 @@ class LogbookSettings(Base):
     default_start_time: Mapped[PyTime | None] = mapped_column(Time)
     default_end_time: Mapped[PyTime | None] = mapped_column(Time)
     default_documentation_url: Mapped[str | None] = mapped_column(Text)
+    extension_pairing_code_hash: Mapped[str | None] = mapped_column(String(64))
+    extension_pairing_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    extension_token_hash: Mapped[str | None] = mapped_column(String(64))
+    extension_token_created_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class WeeklyReflection(Base):
@@ -78,10 +82,12 @@ class AutomationRun(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
     start_date: Mapped[PyDate] = mapped_column(Date, nullable=False)
     end_date: Mapped[PyDate] = mapped_column(Date, nullable=False)
+    runner: Mapped[str] = mapped_column(String(16), default="playwright", server_default="playwright", nullable=False)
     status: Mapped[str] = mapped_column(String(24), default="queued", index=True, nullable=False)
     total_entries: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     completed_entries: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     stop_requested: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    pause_requested: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     last_error: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -109,6 +115,9 @@ class AutomationRunEntry(Base):
     save_attempted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     safe_to_retry: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     retry_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    snapshot_json: Mapped[str | None] = mapped_column(Text)
+    claimed_by: Mapped[str | None] = mapped_column(String(128))
+    lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_error: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
