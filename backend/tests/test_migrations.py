@@ -38,6 +38,16 @@ class MigrationTests(unittest.TestCase):
                         "status",
                     }.issubset(columns)
                 )
+                self.assertTrue(
+                    {"id", "start_date", "end_date", "status", "total_entries", "stop_requested"}.issubset(
+                        {column["name"] for column in inspector.get_columns("automation_runs")}
+                    )
+                )
+                self.assertTrue(
+                    {"id", "run_id", "entry_id", "status", "save_attempted", "safe_to_retry"}.issubset(
+                        {column["name"] for column in inspector.get_columns("automation_run_entries")}
+                    )
+                )
             finally:
                 engine.dispose()
 

@@ -7,7 +7,7 @@ Halaman logbook dibuka dalam sesi browser pengguna. Tanggal Jumat yang kosong di
 | Bagian | Selector/temuan teramati | Status |
 | --- | --- | --- |
 | Konteks panel entri | `#lbhRail` (unik) | Teramati |
-| Simpan harian | `#lbhRail #lbhBtnSave` (unik), nama tombol `Simpan`, tipe `button` | Teramati; efek simpan belum diuji |
+| Simpan harian | `#lbhRail #lbhBtnSave` (unik), nama tombol `Simpan`, tipe `button` | Selector dan konteks teramati; efek simpan belum diuji |
 | Finalisasi | `#lbhStatusBar #lbhBtnFinish` (unik), nama tombol `Selesaikan Logbook Sekarang` | Dilarang; tidak disentuh |
 | Pemilih tanggal | `#lbhCalGrid` (unik); sel hari tidak memiliki `data-date` atau `aria-label` | Cocokkan bulan/tahun dan pastikan angka hari hanya cocok satu kali |
 | Waktu | `#fMulai` dan `#fSelesai`, keduanya `input[type=time]` | Ditandai wajib pada UI; nilai awal portal bukan bukti jam kerja |
@@ -21,7 +21,9 @@ Setiap selector di atas teramati pada DOM halaman yang sedang dibuka dan ditemuk
 
 ## Status implementasi
 
-Mapping kode menyimpan locator konteks `#lbhRail` dan tombol `#lbhBtnSave`, tetapi `mapping_verified=false`. Adapter submit selalu menolak aksi sampai implementasi dan verifikasi berikutnya selesai. Guard hanya menerima locator allowlist yang sama, konteks yang terverifikasi, satu kontrol, dan nama kontrol tepat `Simpan`.
+Mapping kode mengaktifkan hanya selector yang teramati. Sebelum menyimpan, adapter memeriksa URL portal, tanggal aktif pada panel, selector persis, nama tombol `Simpan`, dan jumlah kontrol. Jika pemeriksaan gagal, proses berhenti. Tidak ada selector umum untuk menyimpan.
+
+Setelah klik, adapter menandai hasil tersimpan hanya jika uraian muncul tepat satu kali pada panel tanggal. Jika perubahan halaman, timeout, atau kesalahan browser membuat hasil tidak pasti, antrean berhenti dan pengguna harus memeriksa portal secara manual. Percobaan ulang hasil ambigu memerlukan konfirmasi bahwa pengguna sudah memeriksa dan entri memang tidak ada. Entri yang sudah terdeteksi tidak dikirim ulang.
 
 ## Hal yang belum terverifikasi
 
@@ -31,4 +33,4 @@ Mapping kode menyimpan locator konteks `#lbhRail` dan tombol `#lbhBtnSave`, teta
 - Identitas tanggal pada kalender: sel hanya menampilkan angka hari tanpa atribut tanggal stabil, jadi bulan/tahun harus diverifikasi sebelum pemilihan.
 - Batas panjang dan instruksi isi refleksi.
 
-Sebelum adapter live dibuat, uji guard dengan mock portal dan pastikan halaman serta konteks harian diperiksa sebelum aksi simpan. Setiap perubahan DOM harus membuat otomasi berhenti. Aksi finalisasi logbook selalu dilarang.
+Efek simpan dan indikator portal sesudahnya belum diverifikasi dengan entri sungguhan. Pengujian memakai mock dan tidak mengirim entri. Perubahan DOM yang mengubah selector atau label harus membuat automation berhenti. Aksi finalisasi logbook selalu dilarang.
