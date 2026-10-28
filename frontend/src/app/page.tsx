@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
-
-const API_BASE = "http://127.0.0.1:8000/api";
+import { API_BASE } from "../lib/api";
+import { EntryPreview } from "../components/entry-preview";
 
 type DocsStatus = {
   configured: boolean;
@@ -86,6 +86,7 @@ export default function Home() {
   const [syncResult, setSyncResult] = useState<SyncResult | null>(null);
   const [syncError, setSyncError] = useState("");
   const [syncing, setSyncing] = useState(false);
+  const [entriesRefreshKey, setEntriesRefreshKey] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -247,6 +248,7 @@ export default function Home() {
         );
       }
       setSyncResult(result as SyncResult);
+      setEntriesRefreshKey((current) => current + 1);
     } catch (requestError) {
       setSyncResult(null);
       setSyncError(
@@ -449,6 +451,13 @@ export default function Home() {
             </div>
           </aside>
         </section>
+
+        {selectedRange && (
+          <EntryPreview
+            range={{ start: selectedRange.start, end: selectedRange.end }}
+            refreshKey={entriesRefreshKey}
+          />
+        )}
 
         {syncResult && (
           <section aria-labelledby="coverage-title" className="mt-6">

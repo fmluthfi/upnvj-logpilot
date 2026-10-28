@@ -45,3 +45,11 @@ class LogbookEntry(Base):
         server_default=func.current_timestamp(),
         nullable=False,
     )
+
+
+class LogbookSettings(Base):
+    __tablename__ = "logbook_settings"
+
+    id: Mapped[str] = mapped_column(String(16), primary_key=True, default="local")
+    default_start_time: Mapped[PyTime | None] = mapped_column(Time)
+    default_end_time: Mapped[PyTime | None] = mapped_column(Time)
