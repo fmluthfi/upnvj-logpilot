@@ -1,13 +1,13 @@
 import unittest
 
-from backend.app.automation.safety_guard import (
+from app.automation.safety_guard import (
     PortalMappingNotConfiguredError,
     PortalAction,
     PortalSafetyError,
     assert_action_allowed,
     assert_safe_daily_save,
 )
-from backend.app.automation.portal_adapter import PortalMapping, UnconfiguredPortalAdapter
+from app.automation.portal_adapter import PortalMapping, UnconfiguredPortalAdapter
 
 
 class SafetyGuardTests(unittest.TestCase):

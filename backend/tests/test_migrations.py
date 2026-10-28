@@ -28,7 +28,16 @@ class MigrationTests(unittest.TestCase):
             try:
                 inspector = inspect(engine)
                 columns = {column["name"] for column in inspector.get_columns("logbook_entries")}
-                self.assertTrue({"date", "original_activity", "source_hash", "status"}.issubset(columns))
+                self.assertTrue(
+                    {
+                        "date",
+                        "original_activity",
+                        "source_hash",
+                        "source_payload_json",
+                        "source_conflict",
+                        "status",
+                    }.issubset(columns)
+                )
             finally:
                 engine.dispose()
 
