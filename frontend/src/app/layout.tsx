@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Logpilot — Logbook Magang",
-  description: "Dashboard lokal untuk meninjau logbook magang sebelum dikirim.",
+  title: "Logpilot — Otomasi Logbook Magang",
+  description: "Siapkan catatan logbook magang dari Google Docs untuk rentang tanggal pilihanmu.",
 };
 
 export default function RootLayout({

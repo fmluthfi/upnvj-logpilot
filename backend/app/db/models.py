@@ -14,6 +14,8 @@ class LogbookEntry(Base):
     source_document_id: Mapped[str | None] = mapped_column(String(256))
     source_row_index: Mapped[int | None] = mapped_column(Integer)
     source_hash: Mapped[str | None] = mapped_column(String(64))
+    source_payload_json: Mapped[str | None] = mapped_column(Text)
+    source_conflict: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     week_number: Mapped[int | None] = mapped_column(Integer)
     date: Mapped[PyDate] = mapped_column(Date, index=True, nullable=False)
     original_activity: Mapped[str | None] = mapped_column(Text)

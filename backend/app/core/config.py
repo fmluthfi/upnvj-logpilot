@@ -16,6 +16,14 @@ class Settings(BaseSettings):
     gemini_api_key: SecretStr | None = None
     gemini_model: str = ""
 
+    @property
+    def google_oauth_client_file(self) -> Path:
+        return Path(__file__).resolve().parents[2] / ".local" / "google-oauth-client.json"
+
+    @property
+    def google_oauth_token_file(self) -> Path:
+        return Path(__file__).resolve().parents[2] / ".local" / "google-token.json"
+
 
 @lru_cache
 def get_settings() -> Settings:
