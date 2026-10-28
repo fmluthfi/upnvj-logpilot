@@ -24,6 +24,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse({ accepted: true });
     return;
   }
+  if (value.type === "VERIFY_SAVED" && value.entry && typeof value.entry === "object") {
+    if (activeRunEntryId) {
+      sendResponse({ saved: false });
+      return;
+    }
+    void LogpilotPortalAdapter.verifySaved(value.entry as LogpilotPortalAdapter.EntrySnapshot)
+      .then((saved) => sendResponse({ saved }))
+      .catch(() => sendResponse({ saved: false }));
+    return true;
+  }
   if (value.type !== "RUN_ENTRY" || !isClaim(value.claim)) return;
   const claim = value.claim;
   if (activeRunEntryId) {
@@ -59,6 +69,7 @@ async function runClaim(claim: ClaimedEntry) {
         if (!response.allowed) throw new Error("Backend belum mengizinkan tombol Simpan.");
       },
     });
+    activeRunEntryId = null;
     await sendToWorker({
       type: "ENTRY_RESULT",
       run_id: claim.run_id,
@@ -67,6 +78,7 @@ async function runClaim(claim: ClaimedEntry) {
       error: result.error,
     });
   } catch (error) {
+    activeRunEntryId = null;
     await sendToWorker({
       type: "ENTRY_RESULT",
       run_id: claim.run_id,

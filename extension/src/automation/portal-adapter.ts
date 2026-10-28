@@ -10,13 +10,14 @@ namespace LogpilotPortalAdapter {
     reflection_text: string;
   };
 
-  export type Outcome = "success" | "already_present" | "failed" | "skipped" | "unknown" | "paused" | "stopped";
+  export type Outcome = "success" | "updated" | "already_present" | "failed" | "skipped" | "unknown" | "paused" | "stopped";
   export type Checkpoint = (step: string) => Promise<"continue" | "pause" | "stop">;
   export type Controls = { checkpoint: Checkpoint; markSaveAttempt: () => Promise<void> };
   export type Result = { outcome: Outcome; error?: string };
   class HaltError extends Error {
     constructor(readonly outcome: "paused" | "stopped") { super("Automation dihentikan pada checkpoint aman."); }
   }
+  class UnsupportedRevisionError extends Error {}
 
   const PORTAL_ORIGIN = "https://kampusberdampak.upnvj.ac.id";
   const PORTAL_PATH = "/logbook-harian";
@@ -29,6 +30,7 @@ namespace LogpilotPortalAdapter {
     previousMonth: "#lbhCalPrev",
     nextMonth: "#lbhCalNext",
     add: "#lbhBtnAdd",
+    edit: "#lbhRail #lbhBtnEdit",
     start: "#fMulai",
     end: "#fSelesai",
     activity: "#fUraianField input",
@@ -36,11 +38,11 @@ namespace LogpilotPortalAdapter {
     obstacle: "#fKendala",
     documentation: "#fDok",
     reflection: "#fRefleksi",
-    cancel: "#lbhBtnCancel",
+    cancel: "#lbhRail #lbhBtnCancel",
   } as const;
 
   export async function run(snapshot: EntrySnapshot, controls: Controls): Promise<Result> {
-    let createdForm = false;
+    const formState = { open: false, saveInFlight: false };
     try {
       validateSnapshot(snapshot);
       if (location.origin !== PORTAL_ORIGIN || location.pathname !== PORTAL_PATH) return failed("Buka halaman logbook portal sebelum menjalankan batch.");
@@ -51,11 +53,39 @@ namespace LogpilotPortalAdapter {
       assertDate(panel.textContent ?? "", snapshot.date);
       await requireContinue(controls, "Memeriksa entri");
 
-      if (!(panel.textContent ?? "").toLocaleLowerCase("id-ID").includes("belum ada entri")) {
-        if (normalize(panel.textContent ?? "").includes(normalize(snapshot.activity_text))) {
+      if (!normalize(panel.textContent ?? "").includes("belum ada entri")) {
+        const edit = unique<HTMLButtonElement>(SELECTORS.edit);
+        if (edit.id !== "lbhBtnEdit" || !normalize(edit.textContent ?? "").endsWith("ubah entri")
+          || edit.type !== "button" || edit.disabled || !panel.contains(edit)) {
+          throw new UnsupportedRevisionError("Tombol revisi entri tidak cocok. Tidak ada perubahan yang dibuat.");
+        }
+        edit.click();
+        formState.open = true;
+        await waitFor(() => isRevisionForm(snapshot.date));
+        if (revisionMatches(snapshot, readRevisionFields())) {
+          cancelOpenForm(snapshot);
+          formState.open = false;
           return { outcome: "already_present" };
         }
-        return { outcome: "skipped", error: "Tanggal ini sudah memiliki entri berbeda. Tidak ada perubahan yang dibuat." };
+
+        await requireContinue(controls, "Mengisi revisi");
+        fill(snapshot);
+        await saveForm(snapshot, controls, formState, "update-daily-entry");
+        const revisedPanel = unique<HTMLElement>(SELECTORS.panel);
+        assertDate(revisedPanel.textContent ?? "", snapshot.date);
+        if (occurrences(normalize(revisedPanel.textContent ?? ""), normalize(snapshot.activity_text)) !== 1) {
+          return { outcome: "unknown", error: "Form revisi tertutup, tetapi perubahan belum dapat diverifikasi. Periksa tanggal ini secara manual." };
+        }
+
+        unique<HTMLButtonElement>(SELECTORS.edit).click();
+        formState.open = true;
+        await waitFor(() => isRevisionForm(snapshot.date));
+        const verified = revisionMatches(snapshot, readRevisionFields());
+        cancelOpenForm(snapshot);
+        formState.open = false;
+        return verified
+          ? { outcome: "updated" }
+          : { outcome: "unknown", error: "Portal menutup form, tetapi beberapa field belum cocok dengan revisi. Periksa tanggal ini secara manual." };
       }
 
       if (document.querySelector("#fMulai")) throw new Error("Form portal sudah terbuka. Tutup form tersebut sebelum menjalankan entri.");
@@ -64,30 +94,14 @@ namespace LogpilotPortalAdapter {
         throw new Error("Tombol Tambah Entri tidak cocok dengan halaman yang diperiksa.");
       }
       add.click();
-      createdForm = true;
+      formState.open = true;
       await waitFor(() => document.querySelector(SELECTORS.start) !== null);
       assertDate(unique<HTMLElement>(SELECTORS.panel).textContent ?? "", snapshot.date);
 
       await requireContinue(controls, "Mengisi entri");
       fill(snapshot);
 
-      await requireContinue(controls, "Memeriksa sebelum Simpan");
-      const panelBeforeSave = unique<HTMLElement>(SELECTORS.panel);
-      const saveBeforeMarker = unique<HTMLElement>(LogpilotSafety.DAILY_SAVE_SELECTOR);
-      assertDate(panelBeforeSave.textContent ?? "", snapshot.date);
-      LogpilotSafety.assertDailySaveTarget("save-daily-entry", LogpilotSafety.DAILY_SAVE_SELECTOR, panelBeforeSave, saveBeforeMarker, document.querySelectorAll(LogpilotSafety.DAILY_SAVE_SELECTOR).length);
-      await controls.markSaveAttempt();
-      const currentPanel = unique<HTMLElement>(SELECTORS.panel);
-      const currentSave = unique<HTMLElement>(LogpilotSafety.DAILY_SAVE_SELECTOR);
-      assertDate(currentPanel.textContent ?? "", snapshot.date);
-      LogpilotSafety.clickDailySave("save-daily-entry", LogpilotSafety.DAILY_SAVE_SELECTOR, currentPanel, currentSave, document.querySelectorAll(LogpilotSafety.DAILY_SAVE_SELECTOR).length);
-      createdForm = false;
-      await waitFor(() => {
-        const latestPanel = document.querySelector<HTMLElement>(SELECTORS.panel);
-        return !document.querySelector(SELECTORS.start)
-          && !!latestPanel
-          && normalize(latestPanel.textContent ?? "").includes(normalize(snapshot.activity_text));
-      });
+      await saveForm(snapshot, controls, formState, "save-daily-entry");
       const latestPanel = unique<HTMLElement>(SELECTORS.panel);
       assertDate(latestPanel.textContent ?? "", snapshot.date);
       if (occurrences(normalize(latestPanel.textContent ?? ""), normalize(snapshot.activity_text)) !== 1) {
@@ -95,10 +109,103 @@ namespace LogpilotPortalAdapter {
       }
       return { outcome: "success" };
     } catch (error) {
-      if (createdForm) cancelCreatedForm();
+      if (formState.open && !formState.saveInFlight) {
+        try { cancelOpenForm(snapshot); } catch { /* Leave uncertain portal state untouched. */ }
+      }
       if (error instanceof HaltError) return { outcome: error.outcome };
+      if (error instanceof UnsupportedRevisionError) return { outcome: "skipped", error: error.message };
       return { outcome: "unknown", error: error instanceof Error ? error.message : "Hasil portal tidak dapat dipastikan. Periksa tanggal ini secara manual." };
     }
+  }
+
+  export async function verifySaved(snapshot: EntrySnapshot): Promise<boolean> {
+    let formOpen = false;
+    try {
+      validateSnapshot(snapshot);
+      if (location.origin !== PORTAL_ORIGIN || location.pathname !== PORTAL_PATH) return false;
+      await navigateToDate(snapshot.date, { checkpoint: async () => "continue" });
+      const panel = unique<HTMLElement>(SELECTORS.panel);
+      assertDate(panel.textContent ?? "", snapshot.date);
+      if (!hasPendingValidation(panel)
+        || occurrences(normalize(panel.textContent ?? ""), normalize(snapshot.activity_text)) !== 1) return false;
+
+      const edit = unique<HTMLButtonElement>(SELECTORS.edit);
+      if (edit.id !== "lbhBtnEdit" || !normalize(edit.textContent ?? "").endsWith("ubah entri")
+        || edit.type !== "button" || edit.disabled || !panel.contains(edit)) return false;
+      edit.click();
+      formOpen = true;
+      await waitFor(() => isRevisionForm(snapshot.date));
+      const matches = revisionMatches(snapshot, readRevisionFields());
+      cancelOpenForm(snapshot);
+      formOpen = false;
+      return matches;
+    } catch {
+      if (formOpen) {
+        try { cancelOpenForm(snapshot); } catch { /* Leave an uncertain portal form untouched. */ }
+      }
+      return false;
+    }
+  }
+
+  async function saveForm(snapshot: EntrySnapshot, controls: Controls, state: { open: boolean; saveInFlight: boolean }, action: "save-daily-entry" | "update-daily-entry") {
+    await requireContinue(controls, action === "update-daily-entry" ? "Memeriksa revisi sebelum Simpan" : "Memeriksa sebelum Simpan");
+    const panelBeforeSave = unique<HTMLElement>(SELECTORS.panel);
+    const saveBeforeMarker = unique<HTMLElement>(LogpilotSafety.DAILY_SAVE_SELECTOR);
+    assertDate(panelBeforeSave.textContent ?? "", snapshot.date);
+    LogpilotSafety.assertDailySaveTarget(action, LogpilotSafety.DAILY_SAVE_SELECTOR, panelBeforeSave, saveBeforeMarker, document.querySelectorAll(LogpilotSafety.DAILY_SAVE_SELECTOR).length);
+    await controls.markSaveAttempt();
+    state.saveInFlight = true;
+    const currentPanel = unique<HTMLElement>(SELECTORS.panel);
+    const currentSave = unique<HTMLElement>(LogpilotSafety.DAILY_SAVE_SELECTOR);
+    assertDate(currentPanel.textContent ?? "", snapshot.date);
+    LogpilotSafety.clickDailySave(action, LogpilotSafety.DAILY_SAVE_SELECTOR, currentPanel, currentSave, document.querySelectorAll(LogpilotSafety.DAILY_SAVE_SELECTOR).length);
+    await waitFor(() => !document.querySelector(SELECTORS.start));
+    state.open = false;
+    state.saveInFlight = false;
+  }
+
+  function isRevisionForm(date: string) {
+    const panel = document.querySelector<HTMLElement>(SELECTORS.panel);
+    return !!panel && hasDate(panel.textContent ?? "", date)
+      && normalize(panel.textContent ?? "").includes("revisi entri")
+      && document.querySelector(SELECTORS.start) !== null;
+  }
+
+  function hasPendingValidation(panel: HTMLElement) {
+    const statuses = Array.from(panel.querySelectorAll<HTMLButtonElement>("button"))
+      .filter((button) => normalize(button.textContent ?? "") === "menunggu validasi");
+    return statuses.length === 1 && statuses[0].type === "button" && visible(statuses[0]);
+  }
+
+  function readRevisionFields(): Omit<EntrySnapshot, "date"> {
+    const activities = document.querySelectorAll<HTMLInputElement>(SELECTORS.activity);
+    if (activities.length !== 1 || !visible(activities[0])) {
+      throw new UnsupportedRevisionError("Entri memiliki lebih dari satu poin uraian atau field tidak terbaca. Revisi otomatis dihentikan tanpa menyimpan.");
+    }
+    const start = unique<HTMLInputElement>(SELECTORS.start).value;
+    const end = unique<HTMLInputElement>(SELECTORS.end).value;
+    if (!/^([01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/.test(start) || !/^([01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/.test(end)) {
+      throw new UnsupportedRevisionError("Jam pada entri portal tidak dapat dibandingkan. Revisi otomatis dihentikan tanpa menyimpan.");
+    }
+    return {
+      start_time: start.slice(0, 5),
+      end_time: end.slice(0, 5),
+      activity_text: activities[0].value,
+      result_text: unique<HTMLTextAreaElement>(SELECTORS.result).value,
+      obstacle_text: unique<HTMLTextAreaElement>(SELECTORS.obstacle).value,
+      documentation_url: unique<HTMLInputElement>(SELECTORS.documentation).value,
+      reflection_text: unique<HTMLTextAreaElement>(SELECTORS.reflection).value,
+    };
+  }
+
+  function revisionMatches(snapshot: EntrySnapshot, current: Omit<EntrySnapshot, "date">) {
+    return snapshot.start_time === current.start_time
+      && snapshot.end_time === current.end_time
+      && compareText(snapshot.activity_text) === compareText(current.activity_text)
+      && compareText(snapshot.result_text) === compareText(current.result_text)
+      && compareText(snapshot.obstacle_text) === compareText(current.obstacle_text)
+      && snapshot.documentation_url.trim() === current.documentation_url.trim()
+      && compareText(snapshot.reflection_text) === compareText(current.reflection_text);
   }
 
   export function parseMonthHeading(value: string): { year: number; month: number } | null {
@@ -108,7 +215,7 @@ namespace LogpilotPortalAdapter {
     return month < 0 ? null : { year: Number(match[2]), month };
   }
 
-  async function navigateToDate(date: string, controls: Controls) {
+  async function navigateToDate(date: string, controls: Pick<Controls, "checkpoint">) {
     const target = parseDate(date);
     for (let tries = 0; tries < 120; tries += 1) {
       await requireContinue(controls, "Membuka tanggal");
@@ -220,19 +327,26 @@ namespace LogpilotPortalAdapter {
     return !element.hasAttribute("hidden") && element.getClientRects().length > 0;
   }
 
-  function cancelCreatedForm() {
+  function cancelOpenForm(snapshot: EntrySnapshot) {
+    const panel = unique<HTMLElement>(SELECTORS.panel);
     const buttons = document.querySelectorAll<HTMLButtonElement>(SELECTORS.cancel);
-    if (buttons.length === 1 && buttons[0].type === "button" && buttons[0].textContent?.trim() === "Batal"
-      && unique<HTMLElement>(SELECTORS.panel).contains(buttons[0])) buttons[0].click();
+    assertDate(panel.textContent ?? "", snapshot.date);
+    if (buttons.length !== 1 || buttons[0].type !== "button" || buttons[0].textContent?.trim() !== "Batal"
+      || !visible(buttons[0]) || !panel.contains(buttons[0])) throw new Error("Tombol Batal tidak dapat diidentifikasi secara aman.");
+    buttons[0].click();
   }
 
-  async function requireContinue(controls: Controls, step: string) {
+  async function requireContinue(controls: Pick<Controls, "checkpoint">, step: string) {
     const directive = await controls.checkpoint(step);
     if (directive !== "continue") throw new HaltError(directive === "stop" ? "stopped" : "paused");
   }
 
   function normalize(value: string) {
     return value.normalize("NFKC").replace(/\s+/g, " ").trim().toLocaleLowerCase("id-ID");
+  }
+
+  function compareText(value: string) {
+    return value.normalize("NFKC").trim();
   }
 
   function occurrences(value: string, part: string) {

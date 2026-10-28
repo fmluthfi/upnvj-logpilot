@@ -84,7 +84,7 @@ export function LogbookEntryRow({ entry, onSave, onApprove, onGenerateResult }: 
     setSaved(false);
   }
 
-  const isReadOnly = ["skipped", "processing", "submitted", "verification_needed"].includes(entry.status);
+  const isReadOnly = ["skipped", "processing", "verification_needed"].includes(entry.status);
   const dirty = (entry.source_conflict && sourceReviewed)
     || (entry.activity_text === null && entry.original_activity !== null && draft.activity_text === entry.original_activity)
     || Object.keys(draft).some(
@@ -164,6 +164,9 @@ export function LogbookEntryRow({ entry, onSave, onApprove, onGenerateResult }: 
             {statusLabel}
           </span>
         </div>
+        {entry.status === "submitted" && (
+          <p className="text-sm leading-6 text-base-content/70">Entri ini sudah ada di portal. Perubahan akan dikirim setelah disimpan dan disetujui ulang.</p>
+        )}
 
         <details className="collapse collapse-arrow rounded-box bg-base-200">
           <summary className="collapse-title min-h-0 py-2 text-sm font-medium">Teks dari dokumen</summary>

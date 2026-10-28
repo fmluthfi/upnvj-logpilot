@@ -116,7 +116,6 @@ export function EntryPreview({ range, refreshKey }: Props) {
           </div>
 
           <EntryDefaultHours
-            key={`${range.start}|${range.end}`}
             range={range}
             eligibleCount={eligibleCount}
             documentationEligibleCount={documentationEligibleCount}

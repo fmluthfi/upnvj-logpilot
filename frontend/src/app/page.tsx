@@ -368,6 +368,9 @@ export default function Home() {
                   <button type="button" className="btn btn-outline btn-sm" disabled={!startDate} onClick={() => setQuickRange(7)}>
                     1 minggu
                   </button>
+                  <button type="button" className="btn btn-outline btn-sm" disabled={!startDate} onClick={() => setQuickRange(30)}>
+                    1 bulan
+                  </button>
                 </div>
 
                 {error ? (

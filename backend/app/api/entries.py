@@ -98,7 +98,7 @@ def generate_entry_result(
     session: Session = Depends(get_db),
 ) -> dict[str, str]:
     entry = _find_entry(session, entry_id)
-    if entry.status in {"skipped", "processing", "submitted", "verification_needed"} or entry.portal_entry_id:
+    if entry.status in {"skipped", "processing", "verification_needed"}:
         raise HTTPException(status_code=409, detail="Catatan ini tidak dapat dibuatkan hasil.")
     if entry.source_conflict:
         raise HTTPException(status_code=409, detail="Tinjau perubahan sumber sebelum membuat hasil.")
@@ -118,7 +118,7 @@ def update_entry(
     session: Session = Depends(get_db),
 ) -> dict:
     entry = _find_entry(session, entry_id)
-    if entry.status in {"processing", "submitted", "verification_needed"} or entry.portal_entry_id:
+    if entry.status in {"processing", "verification_needed"}:
         raise HTTPException(status_code=409, detail="Catatan yang sudah dikirim tidak dapat diubah di sini.")
     if entry.status == "skipped":
         raise HTTPException(status_code=409, detail="Catatan izin/sakit tidak dapat disetujui sebagai entri kerja.")

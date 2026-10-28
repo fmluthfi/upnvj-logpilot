@@ -19,6 +19,7 @@ from app.api.extension import (
     report_entry,
     mark_save_attempted,
     latest_job,
+    read_uncertain_entry,
     retry_extension_job,
     unpair_extension,
 )
@@ -153,6 +154,100 @@ class ExtensionApiTests(unittest.TestCase):
         self.assertIsNone(next_claim)
         self.assertEqual(item.status, "verification_needed")
 
+    def test_verified_saved_entry_resumes_batch_after_expired_lease(self):
+        run_payload = self.prepare()
+        token = self.pair()
+        authorization = f"Bearer {token}"
+        claim = claim_next_entry(WorkerRequest(worker_id="extension-a"), authorization=authorization, session=self.session)
+        run = self.session.get(AutomationRun, run_payload["id"])
+        item = self.session.query(AutomationRunEntry).filter_by(run_id=run.id).one()
+        next_entry = LogbookEntry(
+            date=date(2026, 10, 2), activity_text="Meninjau halaman fasilitas.",
+            result_text="Catatan ditinjau.", obstacle_text="", start_time=time(9), end_time=time(17),
+            documentation_url="https://drive.google.com/file/d/example/view", entry_approved=True,
+            status="approved", source_conflict=False,
+        )
+        self.session.add(next_entry)
+        self.session.flush()
+        next_snapshot = {**claim["entry"], "date": "2026-10-02", "entry_id": next_entry.id}
+        self.session.add(AutomationRunEntry(
+            run_id=run.id, entry_id=next_entry.id, status="queued", snapshot_json=json.dumps(next_snapshot),
+        ))
+        run.total_entries = 2
+        item.save_attempted = True
+        item.lease_expires_at = datetime.now(timezone.utc) - timedelta(minutes=1)
+        self.session.commit()
+
+        claim_next_entry(WorkerRequest(worker_id="extension-b"), authorization=authorization, session=self.session)
+        pending = read_uncertain_entry(
+            run.id, item.id, authorization=authorization, session=self.session,
+        )
+        self.assertEqual(pending["entry"]["date"], "2026-10-01")
+        result = report_entry(
+            run.id, item.id,
+            ReportRequest(worker_id="extension-a", outcome="success", portal_verified=True),
+            authorization=authorization, session=self.session,
+        )
+
+        self.session.refresh(run)
+        self.session.refresh(item)
+        self.assertEqual(item.status, "submitted")
+        self.assertEqual(result["completed_entries"], 1)
+        self.assertEqual(result["counts"]["queued"], 1)
+        self.assertEqual(result["status"], "ready")
+        self.assertFalse(run.pause_requested)
+
+        repeated = report_entry(
+            run.id, item.id,
+            ReportRequest(worker_id="extension-a", outcome="success", portal_verified=True),
+            authorization=authorization, session=self.session,
+        )
+        self.assertEqual(repeated["completed_entries"], 1)
+
+    def test_expired_saved_entry_cannot_resume_without_portal_verification(self):
+        run = self.prepare()
+        token = self.pair()
+        authorization = f"Bearer {token}"
+        claim = claim_next_entry(WorkerRequest(worker_id="extension-a"), authorization=authorization, session=self.session)
+        item = self.session.query(AutomationRunEntry).filter_by(run_id=run["id"]).one()
+        item.save_attempted = True
+        item.lease_expires_at = datetime.now(timezone.utc) - timedelta(minutes=1)
+        self.session.commit()
+        claim_next_entry(WorkerRequest(worker_id="extension-b"), authorization=authorization, session=self.session)
+
+        with self.assertRaises(HTTPException) as error:
+            report_entry(
+                run["id"], item.id,
+                ReportRequest(worker_id="extension-a", outcome="success"),
+                authorization=authorization, session=self.session,
+            )
+
+        self.assertEqual(error.exception.status_code, 409)
+        self.assertEqual(item.status, "verification_needed")
+
+    def test_verified_saved_entry_keeps_an_explicit_user_pause(self):
+        run_payload = self.prepare()
+        token = self.pair()
+        authorization = f"Bearer {token}"
+        claim = claim_next_entry(WorkerRequest(worker_id="extension-a"), authorization=authorization, session=self.session)
+        run = self.session.get(AutomationRun, run_payload["id"])
+        item = self.session.query(AutomationRunEntry).filter_by(run_id=run.id).one()
+        control_extension_run(self.session, run, "pause")
+        item.save_attempted = True
+        item.lease_expires_at = datetime.now(timezone.utc) - timedelta(minutes=1)
+        self.session.commit()
+        claim_next_entry(WorkerRequest(worker_id="extension-b"), authorization=authorization, session=self.session)
+
+        result = report_entry(
+            run.id, item.id,
+            ReportRequest(worker_id="extension-a", outcome="success", portal_verified=True),
+            authorization=authorization, session=self.session,
+        )
+
+        self.assertEqual(result["status"], "paused")
+        self.assertTrue(result["pause_requested"])
+        self.assertEqual(result["completed_entries"], 1)
+
     def test_expired_claim_before_save_is_safe_to_reclaim(self):
         run = self.prepare()
         token = self.pair()
@@ -229,6 +324,33 @@ class ExtensionApiTests(unittest.TestCase):
             ), authorization=authorization, session=self.session,
         )
         self.assertEqual(result["status"], "completed")
+
+    def test_updated_report_records_a_revision_once(self):
+        run = self.prepare()
+        token = self.pair()
+        authorization = f"Bearer {token}"
+        claimed = claim_next_entry(WorkerRequest(worker_id="extension-a"), authorization=authorization, session=self.session)
+        mark_save_attempted(
+            run["id"], claimed["run_entry_id"], SaveAttemptRequest(worker_id="extension-a"),
+            authorization=authorization, session=self.session,
+        )
+
+        result = report_entry(
+            run["id"], claimed["run_entry_id"], ReportRequest(worker_id="extension-a", outcome="updated"),
+            authorization=authorization, session=self.session,
+        )
+        item = self.session.query(AutomationRunEntry).filter_by(run_id=run["id"]).one()
+        self.session.refresh(self.entry)
+        self.assertEqual(item.status, "updated")
+        self.assertEqual(result["counts"]["updated"], 1)
+        self.assertEqual(result["completed_entries"], 1)
+        self.assertEqual(self.entry.status, "submitted")
+
+        repeated = report_entry(
+            run["id"], claimed["run_entry_id"], ReportRequest(worker_id="extension-a", outcome="updated"),
+            authorization=authorization, session=self.session,
+        )
+        self.assertEqual(repeated["completed_entries"], 1)
 
     def test_failed_extension_entry_cannot_retry_a_changed_snapshot(self):
         run = self.prepare()

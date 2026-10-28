@@ -19,6 +19,7 @@ router = APIRouter(prefix="/extension", tags=["Chrome extension"])
 DASHBOARD_ORIGINS = {"http://localhost:3000", "http://127.0.0.1:3000"}
 PAIRING_TTL = timedelta(minutes=5)
 CLAIM_TTL = timedelta(minutes=2)
+LEASE_EXPIRED_AFTER_SAVE = "Lease berakhir setelah upaya Simpan. Periksa portal sebelum mencoba ulang."
 
 
 class PairRequest(BaseModel):
@@ -34,8 +35,9 @@ class SaveAttemptRequest(WorkerRequest):
 
 
 class ReportRequest(WorkerRequest):
-    outcome: Literal["success", "failed", "skipped", "unknown", "already_present", "paused", "stopped"]
+    outcome: Literal["success", "updated", "failed", "skipped", "unknown", "already_present", "paused", "stopped"]
     error: str | None = Field(default=None, max_length=1000)
+    portal_verified: bool = False
 
 
 class ControlRequest(BaseModel):
@@ -145,6 +147,26 @@ def latest_job(
     return _run_payload(session, run) if run else None
 
 
+@router.get("/jobs/{run_id}/entries/{run_entry_id}")
+def read_uncertain_entry(
+    run_id: str,
+    run_entry_id: str,
+    authorization: str | None = Header(default=None),
+    session: Session = Depends(get_db),
+) -> dict:
+    _authenticate(session, authorization)
+    run = _get_run(session, run_id)
+    item = session.scalar(select(AutomationRunEntry).where(
+        AutomationRunEntry.id == run_entry_id,
+        AutomationRunEntry.run_id == run_id,
+    ))
+    if run.runner != "extension" or item is None:
+        raise HTTPException(status_code=404, detail="Entri batch tidak ditemukan.")
+    if item.status != "verification_needed" or not item.save_attempted:
+        raise HTTPException(status_code=409, detail="Entri tidak memerlukan verifikasi hasil Simpan.")
+    return _claim_payload(run, item)
+
+
 @router.get("/jobs/{run_id}")
 def read_job(
     run_id: str,
@@ -238,7 +260,29 @@ def _report_entry(run_id: str, run_entry_id: str, request: ReportRequest, author
     ))
     if item is None:
         raise HTTPException(status_code=404, detail="Entri batch tidak ditemukan.")
-    if item.status in {"submitted", "failed", "skipped", "stopped", "verification_needed"} or (
+    if item.status == "verification_needed" and item.save_attempted and request.portal_verified and request.outcome in {"success", "updated"}:
+        entry = session.get(LogbookEntry, item.entry_id)
+        if entry is None:
+            raise HTTPException(status_code=409, detail="Catatan sumber tidak lagi tersedia.")
+        verification_error = item.last_error
+        item.status = "updated" if request.outcome == "updated" else "submitted"
+        item.last_error = None
+        entry.status = "submitted"
+        entry.last_submitted_at = _utcnow()
+        entry.last_error = None
+        run.completed_entries += 1
+        remaining_verification = session.scalar(select(AutomationRunEntry.id).where(
+            AutomationRunEntry.run_id == run.id,
+            AutomationRunEntry.status == "verification_needed",
+            AutomationRunEntry.id != item.id,
+        ).limit(1))
+        if not remaining_verification and run.pause_requested and run.last_error == verification_error:
+            run.pause_requested = False
+            run.last_error = None
+        _refresh_extension_run(session, run)
+        session.commit()
+        return _run_payload(session, run)
+    if item.status in {"submitted", "updated", "failed", "skipped", "stopped", "verification_needed"} or (
         item.status == "queued" and request.outcome == "paused"
     ):
         if _same_outcome(item.status, request.outcome):
@@ -252,16 +296,16 @@ def _report_entry(run_id: str, run_entry_id: str, request: ReportRequest, author
         raise HTTPException(status_code=409, detail="Catatan sumber tidak lagi tersedia.")
     expired = item.lease_expires_at is None or _as_utc(item.lease_expires_at) <= _utcnow()
     if expired and item.save_attempted:
-        _mark_verification_needed(session, run, item, entry, "Lease berakhir setelah upaya Simpan. Periksa portal sebelum mencoba ulang.")
+        _mark_verification_needed(session, run, item, entry, LEASE_EXPIRED_AFTER_SAVE)
         session.commit()
         return _run_payload(session, run)
     if expired:
         raise HTTPException(status_code=409, detail="Lease entri sudah berakhir. Klaim ulang entri sebelum melaporkan hasil.")
 
-    if request.outcome == "success":
+    if request.outcome in {"success", "updated"}:
         if not item.save_attempted:
             raise HTTPException(status_code=409, detail="Simpan belum tercatat sebelum hasil sukses dilaporkan.")
-        item.status = "submitted"
+        item.status = "updated" if request.outcome == "updated" else "submitted"
         entry.status = "submitted"
         entry.last_submitted_at = _utcnow()
         entry.last_error = None
@@ -435,7 +479,7 @@ def _reconcile_expired_claims(session: Session, now: datetime) -> None:
         item.claimed_by = None
         item.lease_expires_at = None
         if item.save_attempted:
-            _mark_verification_needed(session, run, item, entry, "Lease berakhir setelah upaya Simpan. Periksa portal sebelum mencoba ulang.")
+            _mark_verification_needed(session, run, item, entry, LEASE_EXPIRED_AFTER_SAVE)
         elif run.stop_requested:
             item.status = "stopped"
             item.safe_to_retry = True
@@ -473,6 +517,7 @@ def _owned_claim(session: Session, run_id: str, run_entry_id: str, worker_id: st
 
 
 def _mark_verification_needed(session: Session, run: AutomationRun, item: AutomationRunEntry, entry: LogbookEntry, message: str) -> None:
+    pause_was_requested = run.pause_requested
     item.status = "verification_needed"
     item.safe_to_retry = False
     item.last_error = message
@@ -482,7 +527,8 @@ def _mark_verification_needed(session: Session, run: AutomationRun, item: Automa
         entry.status = "verification_needed"
         entry.last_error = message
     run.pause_requested = True
-    run.last_error = message
+    if not pause_was_requested:
+        run.last_error = message
     run.status = "paused"
 
 
@@ -521,6 +567,7 @@ def _same_outcome(status: str, outcome: str) -> bool:
     return (status, outcome) in {
         ("submitted", "success"),
         ("submitted", "already_present"),
+        ("updated", "updated"),
         ("failed", "failed"),
         ("skipped", "skipped"),
         ("verification_needed", "failed"),

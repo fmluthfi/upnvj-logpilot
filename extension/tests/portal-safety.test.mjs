@@ -32,9 +32,18 @@ function fixture(overrides = {}) {
   return { panel, button, clicks: () => clicks };
 }
 
-test("only the observed daily Save control can be activated", () => {
+test("only the observed daily Save control can be activated for an approved create", () => {
   const dom = fixture();
   clickDailySave("save-daily-entry", "#lbhRail #lbhBtnSave", dom.panel, dom.button, 1);
+  assert.equal(dom.clicks(), 1);
+});
+
+test("revision Save requires the observed revision form", () => {
+  const dom = fixture();
+  dom.panel.textContent = "Revisi Entri";
+  clickDailySave("update-daily-entry", "#lbhRail #lbhBtnSave", dom.panel, dom.button, 1);
+  assert.equal(dom.clicks(), 1);
+  assert.throws(() => clickDailySave("save-daily-entry", "#lbhRail #lbhBtnSave", dom.panel, dom.button, 1));
   assert.equal(dom.clicks(), 1);
 });
 
