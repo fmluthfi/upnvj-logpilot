@@ -500,15 +500,15 @@ export default function Home() {
                 )}
 
                 <div className="overflow-x-auto">
-                  <table className="table">
+                  <table className="table min-w-[48rem]">
                     <thead>
-                      <tr><th>Tanggal</th><th>Status</th><th>Catatan</th></tr>
+                      <tr><th>Tanggal</th><th className="w-40">Status</th><th>Catatan</th></tr>
                     </thead>
                     <tbody>
                       {syncResult.days.map((day) => (
                         <tr key={day.date}>
                           <td className="whitespace-nowrap font-medium">{formatDate(day.date)}</td>
-                          <td><span className="badge badge-outline">{COVERAGE_LABELS[day.status]}</span></td>
+                          <td className="w-40 whitespace-nowrap"><span className="badge badge-outline whitespace-nowrap">{COVERAGE_LABELS[day.status]}</span></td>
                           <td className="min-w-64 whitespace-normal">
                             {day.entries.length ? day.entries.map((entry) => (
                               <div key={`${day.date}-${entry.source_row_index}`} className="mb-3 last:mb-0">
