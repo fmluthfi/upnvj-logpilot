@@ -155,7 +155,7 @@ export function LogbookEntryRow({ entry, onSave, onApprove, onGenerateResult }: 
   }
 
   return (
-    <article className="grid gap-5 py-6 lg:grid-cols-[minmax(0,1fr)_19rem]">
+    <article className="grid gap-5 py-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
       <div className="min-w-0 space-y-4">
         <div className="flex flex-wrap items-center gap-2">
           <p className="whitespace-nowrap font-medium">{displayDate(entry.date)}</p>
@@ -179,7 +179,7 @@ export function LogbookEntryRow({ entry, onSave, onApprove, onGenerateResult }: 
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="form-control min-w-0">
-            <div className="label flex-wrap gap-2 py-1">
+            <div className="label min-w-0 flex-wrap justify-between gap-2 py-1">
               <span className="label-text text-xs font-medium">Hasil</span>
               {!isReadOnly && (
                 <button type="button" className="btn btn-ghost btn-xs" disabled={!draft.activity_text.trim() || generatingResult || saving || approving} onClick={generateResult}>
@@ -217,7 +217,7 @@ export function LogbookEntryRow({ entry, onSave, onApprove, onGenerateResult }: 
         <p className="-mt-2 text-xs text-base-content/65">Format 24 jam: HH:MM.</p>
         <label className="form-control">
           <span className="label py-1"><span className="label-text text-xs font-medium">Dokumentasi</span></span>
-          <input className="input input-bordered w-full bg-base-100" type="url" placeholder="Tautan dokumentasi" value={draft.documentation_url} disabled={isReadOnly} maxLength={2048} onChange={(event) => updateField("documentation_url", event.target.value)} />
+          <input className="input input-bordered min-w-0 w-full bg-base-100" type="url" placeholder="Tautan dokumentasi" value={draft.documentation_url} disabled={isReadOnly} maxLength={2048} onChange={(event) => updateField("documentation_url", event.target.value)} />
           <span className="label py-1"><span className="label-text-alt">Tautan ini dapat menggantikan bawaan untuk entri ini.</span></span>
         </label>
 

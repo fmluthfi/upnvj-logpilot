@@ -251,17 +251,20 @@ export function WeeklyReflectionEditor({ range, refreshKey }: Props) {
                 ))}
               </div>
 
-              <label className="form-control">
-                <span className="label py-1"><span className="label-text font-medium">Draf refleksi</span></span>
+              <div className="form-control min-w-0">
+                <label htmlFor="weekly-reflection-draft" className="label py-1">
+                  <span className="label-text font-medium">Draf refleksi</span>
+                </label>
                 <textarea
-                  className="textarea textarea-bordered min-h-36 bg-base-100 leading-6"
+                  id="weekly-reflection-draft"
+                  className="textarea textarea-bordered min-h-36 w-full bg-base-100 leading-6"
                   maxLength={1500}
                   value={draft}
                   disabled={busy !== ""}
                   onChange={(event) => setDraft(event.target.value)}
                 />
-                <span className="label py-1"><span className="label-text-alt">{draft.length}/1500 karakter</span></span>
-              </label>
+                <p className="mt-1 text-right text-xs text-base-content/65">{draft.length}/1500 karakter</p>
+              </div>
 
               {data.stale && (
                 <label className="label cursor-pointer justify-start gap-3 whitespace-normal">
