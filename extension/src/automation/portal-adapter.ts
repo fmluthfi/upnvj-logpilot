@@ -238,10 +238,9 @@ namespace LogpilotPortalAdapter {
       const difference = (target.year - current.year) * 12 + target.month - current.month;
       if (difference === 0) {
         const grid = unique<HTMLElement>(SELECTORS.calendar);
-        const dayButtons = Array.from(grid.querySelectorAll<HTMLButtonElement>("button")).filter((button) => {
-          const match = (button.textContent ?? "").trim().match(/^(\d{1,2})(?:\s|$)/);
-          return match?.[1] === String(target.day) && button.type === "button" && !button.disabled;
-        });
+        const dayButtons = Array.from(grid.querySelectorAll<HTMLButtonElement>("button")).filter((button) =>
+          button.getAttribute("data-iso") === date && button.type === "button" && !button.disabled,
+        );
         if (dayButtons.length !== 1) throw new Error("Tanggal tidak dapat dipilih secara unik pada kalender.");
         dayButtons[0].click();
         await waitFor(() => {

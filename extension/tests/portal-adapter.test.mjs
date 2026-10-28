@@ -64,7 +64,8 @@ function mockPortal(initialText = "KAMIS, 1 OKTOBER 2026 · Belum ada entri", in
   let statusVisible = initialText.includes("Menunggu Validasi");
   const panel = new MockElement("lbhRail", initialText);
   const heading = new MockElement("lbhMonthLabel", "Oktober 2026");
-  const day = new MockElement("", "1");
+  const day = new MockElement("", existing ? "1MV" : "1");
+  day.attributes = [{ name: "data-iso", value: "2026-10-01" }];
   let selectedDate = "1 Oktober 2026";
 
   const grid = new MockElement("lbhCalGrid");
@@ -150,7 +151,7 @@ function mockPortal(initialText = "KAMIS, 1 OKTOBER 2026 · Belum ada entri", in
   };
   save.onClick = () => saveDelayMs ? context.setTimeout(completeSave, saveDelayMs) : completeSave();
   context.document = doc;
-  return { doc, panel, fields, save, edit, finish, setDate(value) { selectedDate = value; } };
+  return { doc, panel, day, fields, save, edit, finish, setDate(value) { selectedDate = value; } };
 }
 
 const snapshot = {
@@ -185,6 +186,18 @@ test("pending-validation entry can be verified without another save", async () =
   assert.equal(saved, true);
   assert.equal(portal.doc.formOpen, false);
   assert.equal(portal.edit.clickCount, 1);
+  assert.equal(portal.save.clickCount, 0);
+  assert.equal(portal.finish.clickCount, 0);
+});
+
+test("saved calendar chip is selectable during automatic recovery", async () => {
+  const savedText = `KAMIS, 1 OKTOBER 2026 · ${snapshot.activity_text} · Menunggu Validasi`;
+  const portal = mockPortal(savedText, snapshot);
+  portal.panel.textContent = "RABU, 28 OKTOBER 2026 · Belum ada entri";
+  portal.day.onClick = () => { portal.panel.textContent = savedText; };
+
+  assert.equal(await context.LogpilotPortalAdapter.verifySaved(snapshot), true);
+  assert.equal(portal.day.clickCount, 1);
   assert.equal(portal.save.clickCount, 0);
   assert.equal(portal.finish.clickCount, 0);
 });
