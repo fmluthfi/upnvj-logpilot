@@ -103,9 +103,7 @@ namespace LogpilotPortalAdapter {
       fill(snapshot);
 
       await saveForm(snapshot, controls, formState, "save-daily-entry");
-      if (!await verifySaved(snapshot)) {
-        return { outcome: "unknown", error: "Form tertutup, tetapi entri tidak dapat diverifikasi. Periksa portal secara manual." };
-      }
+      await waitFor(() => savedSummaryMatches(snapshot), SAVE_CONFIRMATION_TIMEOUT_MS);
       return { outcome: "success" };
     } catch (error) {
       if (formState.open && !formState.saveInFlight) {
@@ -123,7 +121,7 @@ namespace LogpilotPortalAdapter {
       validateSnapshot(snapshot);
       if (location.origin !== PORTAL_ORIGIN || location.pathname !== PORTAL_PATH) return false;
       if (document.querySelector(SELECTORS.start)) return false;
-      await navigateToDate(snapshot.date, { checkpoint: async () => "continue" });
+      if (!savedSummaryMatches(snapshot)) await navigateToDate(snapshot.date, { checkpoint: async () => "continue" });
       await waitFor(() => savedSummaryMatches(snapshot), SAVE_CONFIRMATION_TIMEOUT_MS);
       const panel = unique<HTMLElement>(SELECTORS.panel);
       assertDate(panel.textContent ?? "", snapshot.date);

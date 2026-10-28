@@ -173,6 +173,7 @@ test("mock portal fills the approved entry and clicks only the observed daily Sa
   assert.equal(portal.fields["#fHasil"].value, "Halaman fasilitas tersedia.");
   assert.equal(saveMarker, 1);
   assert.equal(portal.save.clickCount, 1);
+  assert.equal(portal.edit.clickCount, 0);
   assert.equal(portal.finish.clickCount, 0);
 });
 
@@ -200,6 +201,7 @@ test("a delayed portal save is verified automatically instead of becoming a manu
   assert.equal(result.outcome, "success", result.error);
   assert.equal(saveMarker, 1);
   assert.equal(portal.save.clickCount, 1);
+  assert.equal(portal.edit.clickCount, 0);
   assert.equal(portal.finish.clickCount, 0);
 });
 
