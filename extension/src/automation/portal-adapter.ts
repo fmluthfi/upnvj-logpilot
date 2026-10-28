@@ -21,6 +21,7 @@ namespace LogpilotPortalAdapter {
 
   const PORTAL_ORIGIN = "https://kampusberdampak.upnvj.ac.id";
   const PORTAL_PATH = "/logbook-harian";
+  const SAVE_CONFIRMATION_TIMEOUT_MS = 30_000;
   const MONTHS = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
   const SHORT_MONTHS = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
   const SELECTORS = {
@@ -102,11 +103,7 @@ namespace LogpilotPortalAdapter {
       fill(snapshot);
 
       await saveForm(snapshot, controls, formState, "save-daily-entry");
-      const latestPanel = unique<HTMLElement>(SELECTORS.panel);
-      assertDate(latestPanel.textContent ?? "", snapshot.date);
-      if (occurrences(normalize(latestPanel.textContent ?? ""), normalize(snapshot.activity_text)) !== 1) {
-        return { outcome: "unknown", error: "Form tertutup, tetapi entri tidak dapat diverifikasi. Periksa portal secara manual." };
-      }
+      await waitFor(() => savedSummaryMatches(snapshot), SAVE_CONFIRMATION_TIMEOUT_MS);
       return { outcome: "success" };
     } catch (error) {
       if (formState.open && !formState.saveInFlight) {
@@ -123,11 +120,11 @@ namespace LogpilotPortalAdapter {
     try {
       validateSnapshot(snapshot);
       if (location.origin !== PORTAL_ORIGIN || location.pathname !== PORTAL_PATH) return false;
-      await navigateToDate(snapshot.date, { checkpoint: async () => "continue" });
+      if (document.querySelector(SELECTORS.start)) return false;
+      if (!savedSummaryMatches(snapshot)) await navigateToDate(snapshot.date, { checkpoint: async () => "continue" });
+      await waitFor(() => savedSummaryMatches(snapshot), SAVE_CONFIRMATION_TIMEOUT_MS);
       const panel = unique<HTMLElement>(SELECTORS.panel);
       assertDate(panel.textContent ?? "", snapshot.date);
-      if (!hasPendingValidation(panel)
-        || occurrences(normalize(panel.textContent ?? ""), normalize(snapshot.activity_text)) !== 1) return false;
 
       const edit = unique<HTMLButtonElement>(SELECTORS.edit);
       if (edit.id !== "lbhBtnEdit" || !normalize(edit.textContent ?? "").endsWith("ubah entri")
@@ -159,7 +156,16 @@ namespace LogpilotPortalAdapter {
     const currentSave = unique<HTMLElement>(LogpilotSafety.DAILY_SAVE_SELECTOR);
     assertDate(currentPanel.textContent ?? "", snapshot.date);
     LogpilotSafety.clickDailySave(action, LogpilotSafety.DAILY_SAVE_SELECTOR, currentPanel, currentSave, document.querySelectorAll(LogpilotSafety.DAILY_SAVE_SELECTOR).length);
-    await waitFor(() => !document.querySelector(SELECTORS.start));
+    await waitFor(() => !document.querySelector(SELECTORS.start)
+      || (action === "save-daily-entry" && savedSummaryMatches(snapshot)),
+    action === "save-daily-entry" ? SAVE_CONFIRMATION_TIMEOUT_MS : undefined);
+    if (document.querySelector(SELECTORS.start)) {
+      if (action !== "save-daily-entry" || !savedSummaryMatches(snapshot)) {
+        throw new Error("Status entri tersimpan belum terlihat. Periksa portal sebelum mencoba lagi.");
+      }
+      cancelOpenForm(snapshot);
+      await waitFor(() => !document.querySelector(SELECTORS.start));
+    }
     state.open = false;
     state.saveInFlight = false;
   }
@@ -175,6 +181,13 @@ namespace LogpilotPortalAdapter {
     const statuses = Array.from(panel.querySelectorAll<HTMLButtonElement>("button"))
       .filter((button) => normalize(button.textContent ?? "") === "menunggu validasi");
     return statuses.length === 1 && statuses[0].type === "button" && visible(statuses[0]);
+  }
+
+  function savedSummaryMatches(snapshot: EntrySnapshot) {
+    const panel = document.querySelector<HTMLElement>(SELECTORS.panel);
+    const text = panel?.textContent ?? "";
+    return !!panel && hasDate(text, snapshot.date) && hasPendingValidation(panel)
+      && occurrences(normalize(text), normalize(snapshot.activity_text)) === 1;
   }
 
   function readRevisionFields(): Omit<EntrySnapshot, "date"> {
@@ -225,10 +238,9 @@ namespace LogpilotPortalAdapter {
       const difference = (target.year - current.year) * 12 + target.month - current.month;
       if (difference === 0) {
         const grid = unique<HTMLElement>(SELECTORS.calendar);
-        const dayButtons = Array.from(grid.querySelectorAll<HTMLButtonElement>("button")).filter((button) => {
-          const match = (button.textContent ?? "").trim().match(/^(\d{1,2})(?:\s|$)/);
-          return match?.[1] === String(target.day) && button.type === "button" && !button.disabled;
-        });
+        const dayButtons = Array.from(grid.querySelectorAll<HTMLButtonElement>("button")).filter((button) =>
+          button.getAttribute("data-iso") === date && button.type === "button" && !button.disabled,
+        );
         if (dayButtons.length !== 1) throw new Error("Tanggal tidak dapat dipilih secara unik pada kalender.");
         dayButtons[0].click();
         await waitFor(() => {

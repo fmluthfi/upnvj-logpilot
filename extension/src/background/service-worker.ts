@@ -119,6 +119,13 @@ async function handlePortalMessage(message: Record<string, unknown>, tab: chrome
     await writeState(state);
     return { allowed: true };
   }
+  if (message.type === "SAVE_HEARTBEAT") {
+    if (!state.save_attempted) throw new Error("Belum ada upaya Simpan yang perlu dijaga.");
+    return LogpilotApi.request(
+      `/extension/jobs/${encodeURIComponent(claim.run_id)}/entries/${encodeURIComponent(claim.run_entry_id)}/heartbeat`,
+      { method: "POST", body: JSON.stringify({ worker_id: await workerId() }) }, token,
+    );
+  }
   if (message.type === "ENTRY_RESULT" && typeof message.outcome === "string") {
     return recordResult(state, message.outcome, typeof message.error === "string" ? message.error : undefined, token);
   }

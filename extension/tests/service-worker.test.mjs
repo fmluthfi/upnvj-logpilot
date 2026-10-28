@@ -15,6 +15,7 @@ function createRunner({ paused = false, activeSave = false, deferVerification = 
   const handlers = {};
   const messages = [];
   const reports = [];
+  const heartbeats = [];
   let releaseVerification = () => {};
   let claimCount = paused ? 1 : 0;
   let currentRun = {
@@ -79,6 +80,10 @@ function createRunner({ paused = false, activeSave = false, deferVerification = 
           : claimCount === 2 ? claim("run-1", "item-2", "2026-10-02") : null;
       }
       if (path.endsWith("/save-attempted")) return { save_attempted: true };
+      if (path.endsWith("/heartbeat")) {
+        heartbeats.push(path);
+        return { run_status: "running", pause_requested: false, stop_requested: false };
+      }
       if (path.endsWith("/report")) {
         const body = JSON.parse(init.body);
         reports.push(body);
@@ -110,8 +115,25 @@ function createRunner({ paused = false, activeSave = false, deferVerification = 
   const send = (message, sender) => new Promise((resolve) => {
     handlers.message(message, sender, resolve);
   });
-  return { send, messages, reports, releaseVerification: () => releaseVerification() };
+  return { send, messages, reports, heartbeats, releaseVerification: () => releaseVerification() };
 }
+
+test("a save in progress renews its lease without another save", async () => {
+  const runner = createRunner();
+  const popup = { id: "extension-id", url: "chrome-extension://extension-id/popup.html" };
+  const portal = { id: "extension-id", tab: { id: 42, url: portalUrl } };
+  await runner.send({ type: "START_RUN" }, popup);
+
+  const beforeSave = await runner.send({ type: "SAVE_HEARTBEAT", run_id: "run-1", run_entry_id: "item-1" }, portal);
+  assert.equal(beforeSave.ok, false);
+  await runner.send({ type: "SAVE_ATTEMPT", run_id: "run-1", run_entry_id: "item-1" }, portal);
+  const duringSave = await runner.send({ type: "SAVE_HEARTBEAT", run_id: "run-1", run_entry_id: "item-1" }, portal);
+
+  assert.equal(duringSave.ok, true);
+  assert.deepEqual(runner.heartbeats, ["/extension/jobs/run-1/entries/item-1/heartbeat"]);
+  assert.equal(runner.reports.length, 0);
+  assert.equal(runner.messages.some((message) => /selesaikan logbook/i.test(JSON.stringify(message))), false);
+});
 
 test("a verified pending-validation save automatically dispatches the next date", async () => {
   const runner = createRunner();
