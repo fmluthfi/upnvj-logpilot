@@ -2,9 +2,6 @@
 
 import { useState, type FormEvent } from "react";
 
-const PERIOD_START = "2026-09-21";
-const PERIOD_END = "2027-01-20";
-
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("id-ID", {
     day: "numeric",
@@ -35,17 +32,6 @@ export default function Home() {
 
     if (!startDate || !endDate) {
       setError("Pilih tanggal mulai dan tanggal akhir.");
-      setSelectedRange(null);
-      return;
-    }
-
-    if (
-      startDate < PERIOD_START ||
-      startDate > PERIOD_END ||
-      endDate < PERIOD_START ||
-      endDate > PERIOD_END
-    ) {
-      setError("Pilih tanggal di dalam periode magang yang tersedia.");
       setSelectedRange(null);
       return;
     }
@@ -148,12 +134,12 @@ export default function Home() {
                   <p className="text-sm font-semibold text-primary">Langkah 1</p>
                   <h2 className="card-title mt-1 text-2xl">Pilih periode</h2>
                   <p className="mt-1 max-w-xl text-sm leading-6 text-base-content/65">
-                    Tanggal awal dan akhir dihitung inklusif, dan dibatasi pada
-                    periode logbook yang tersedia.
+                    Tanggal dihitung inklusif. Pilih sesuai masa magangmu; tidak
+                    ada batas tanggal berdasarkan contoh logbook.
                   </p>
                 </div>
                 <span className="badge badge-ghost px-3 py-3">
-                  21 Sep 2026 — 20 Jan 2027
+                  Sesuai periode magangmu
                 </span>
               </div>
 
@@ -166,8 +152,6 @@ export default function Home() {
                     <input
                       className="input input-bordered w-full bg-base-100"
                       type="date"
-                      min={PERIOD_START}
-                      max={PERIOD_END}
                       value={startDate}
                       onChange={(event) => updateStart(event.target.value)}
                       aria-invalid={Boolean(error)}
@@ -181,8 +165,6 @@ export default function Home() {
                     <input
                       className="input input-bordered w-full bg-base-100"
                       type="date"
-                      min={PERIOD_START}
-                      max={PERIOD_END}
                       value={endDate}
                       onChange={(event) => updateEnd(event.target.value)}
                       aria-invalid={Boolean(error)}
@@ -197,8 +179,8 @@ export default function Home() {
                   </p>
                 ) : (
                   <p id="range-hint" className="mt-3 text-sm text-base-content/60">
-                    Batas periode mengikuti logbook contoh dan dapat disesuaikan
-                    saat pengaturan periode tersedia.
+                    Tidak ada batas periode bawaan. Pastikan tanggal sesuai
+                    dengan masa magangmu.
                   </p>
                 )}
 
