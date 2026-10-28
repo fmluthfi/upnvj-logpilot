@@ -1,9 +1,10 @@
 from datetime import date
+from hashlib import sha256
 import re
 from typing import Literal
 from urllib.parse import urlsplit
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy.orm import Session
 
@@ -17,7 +18,8 @@ from app.services.google_docs_auth import (
     start_oauth_flow,
 )
 from app.services.google_docs_client import GoogleDocsReadError, get_document
-from app.services.google_docs_parser import parse_document
+from app.services.file_logbook_parser import FileLogbookError, MAX_UPLOAD_BYTES, parse_uploaded_logbook
+from app.services.google_docs_parser import ParsedLogbookRow, parse_document
 from app.services.logbook_coverage import build_coverage
 from app.services.logbook_sync import persist_source_rows
 
@@ -85,22 +87,53 @@ def sync_docs(request: SyncRequest, session: Session = Depends(get_db)) -> dict:
             detail="Struktur tabel dokumen belum dapat dibaca dengan aman.",
         ) from error
 
+    return _sync_rows(session, document_id, rows, request.start_date, request.end_date)
+
+
+@router.post("/upload")
+def upload_logbook(
+    file: UploadFile = File(...),
+    start_date: date = Form(...),
+    end_date: date = Form(...),
+    session: Session = Depends(get_db),
+) -> dict:
+    if start_date > end_date:
+        raise HTTPException(status_code=422, detail="Tanggal mulai harus sebelum atau sama dengan tanggal akhir.")
+    try:
+        content = file.file.read(MAX_UPLOAD_BYTES + 1)
+        rows = parse_uploaded_logbook(file.filename or "", content)
+    except FileLogbookError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    finally:
+        file.file.close()
+
+    source_id = "upload:" + sha256((file.filename or "").casefold().encode("utf-8")).hexdigest()
+    return _sync_rows(session, source_id, rows, start_date, end_date)
+
+
+def _sync_rows(
+    session: Session,
+    source_id: str,
+    rows: list[ParsedLogbookRow],
+    start_date: date,
+    end_date: date,
+) -> dict:
     sync_counts = persist_source_rows(
         session,
-        document_id,
+        source_id,
         rows,
-        request.start_date,
-        request.end_date,
+        start_date,
+        end_date,
     )
     coverage = build_coverage(
-        request.start_date,
-        request.end_date,
+        start_date,
+        end_date,
         rows,
         set(sync_counts.conflicts),
     )
     return {
-        "start_date": request.start_date,
-        "end_date": request.end_date,
+        "start_date": start_date,
+        "end_date": end_date,
         "summary": coverage.summary,
         "days": [
             {
