@@ -40,6 +40,11 @@ def persist_source_rows(
         statement = statement.where(LogbookEntry.date.between(start_date, end_date))
     existing_entries = list(session.scalars(statement))
     unmatched = {entry.id: entry for entry in existing_entries}
+    other_statement = select(LogbookEntry).where(LogbookEntry.source_document_id != document_id)
+    if start_date is not None and end_date is not None:
+        other_statement = other_statement.where(LogbookEntry.date.between(start_date, end_date))
+    other_entries = list(session.scalars(other_statement))
+    adopted: list[LogbookEntry] = []
 
     for row in rows:
         if row.kind == "blank":
@@ -59,6 +64,12 @@ def persist_source_rows(
             )
         if existing is None and len(same_date) == 1:
             existing = same_date[0]
+        if existing is None:
+            other_same_date = [entry for entry in other_entries if entry.date == row.date]
+            if len(other_same_date) == 1:
+                existing = other_same_date[0]
+                other_entries.remove(existing)
+                adopted.append(existing)
 
         if existing is None:
             session.add(
@@ -85,7 +96,8 @@ def persist_source_rows(
             created += 1
             continue
 
-        unmatched.pop(existing.id)
+        unmatched.pop(existing.id, None)
+        existing.source_document_id = document_id
         existing.source_row_index = row.source_row_index
 
         if existing.source_hash == row.source_hash:
@@ -123,7 +135,7 @@ def persist_source_rows(
         existing.status = "needs_review"
         existing.last_error = "Catatan tidak ditemukan lagi pada sumber; periksa sebelum digunakan."
 
-    conflict_count = sum(entry.source_conflict for entry in existing_entries)
+    conflict_count = sum(entry.source_conflict for entry in [*existing_entries, *adopted])
     session.commit()
     return SyncCounts(created, updated, unchanged, frozenset(conflicts), conflict_count)
 
