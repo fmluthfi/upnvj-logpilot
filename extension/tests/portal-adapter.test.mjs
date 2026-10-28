@@ -24,7 +24,7 @@ class MockElement {
   contains(element) { return element === this || element.parentElement === this; }
   querySelectorAll(selector) {
     if (selector === "#lbhBtnSave" && this.doc?.formOpen) return [this.doc.save];
-    if (selector === "button") return [this.doc.status];
+    if (selector === "button") return this.doc?.statusVisible ? [this.doc.status] : [];
     return [];
   }
   click() { this.clickCount += 1; this.onClick(); }
@@ -36,21 +36,32 @@ class MockTextarea extends MockElement {}
 Object.defineProperty(MockInput.prototype, "value", { get() { return this._value; }, set(value) { this._value = value; } });
 Object.defineProperty(MockTextarea.prototype, "value", { get() { return this._value; }, set(value) { this._value = value; } });
 
+const mutationObservers = new Set();
+class MockMutationObserver {
+  constructor(callback) { this.callback = callback; }
+  observe() { mutationObservers.add(this); }
+  disconnect() { mutationObservers.delete(this); }
+  static notify() { for (const observer of mutationObservers) observer.callback(); }
+}
+
 const context = vm.createContext({
   Element: MockElement,
   HTMLInputElement: MockInput,
   HTMLTextAreaElement: MockTextarea,
+  MutationObserver: MockMutationObserver,
+  setTimeout: (callback, delay) => globalThis.setTimeout(callback, delay / 1000),
+  clearTimeout: (timeout) => globalThis.clearTimeout(timeout),
   URL,
   Event: class {},
-  MutationObserver: class {},
   location: { origin: "https://kampusberdampak.upnvj.ac.id", pathname: "/logbook-harian" },
-  document: {},
+  document: { documentElement: {} },
 });
 vm.runInContext(readFileSync(new URL("../dist/automation/safety.js", import.meta.url), "utf8"), context);
 vm.runInContext(readFileSync(new URL("../dist/automation/portal-adapter.js", import.meta.url), "utf8"), context);
 
-function mockPortal(initialText = "KAMIS, 1 OKTOBER 2026 · Belum ada entri", initialValues = {}) {
+function mockPortal(initialText = "KAMIS, 1 OKTOBER 2026 · Belum ada entri", initialValues = {}, { saveDelayMs = 0, keepFormOpenOnSave = false } = {}) {
   let existing = !initialText.toLowerCase().includes("belum ada entri");
+  let statusVisible = initialText.includes("Menunggu Validasi");
   const panel = new MockElement("lbhRail", initialText);
   const heading = new MockElement("lbhMonthLabel", "Oktober 2026");
   const day = new MockElement("", "1");
@@ -90,6 +101,7 @@ function mockPortal(initialText = "KAMIS, 1 OKTOBER 2026 · Belum ada entri", in
   let formOpen = false;
   const doc = {
     formOpen: false,
+    get statusVisible() { return statusVisible; },
     save,
     getElementById: () => null,
     querySelectorAll(selector) {
@@ -126,12 +138,17 @@ function mockPortal(initialText = "KAMIS, 1 OKTOBER 2026 · Belum ada entri", in
     doc.formOpen = false;
     panel.textContent = `KAMIS, ${selectedDate.toUpperCase()} · ${activityFields.map((field) => field.value).join(" ")} · Menunggu Validasi`;
   };
-  save.onClick = () => {
-    formOpen = false;
-    doc.formOpen = false;
+  const completeSave = () => {
+    if (!keepFormOpenOnSave) {
+      formOpen = false;
+      doc.formOpen = false;
+    }
     existing = true;
+    statusVisible = true;
     panel.textContent = `KAMIS, ${selectedDate.toUpperCase()} · ${activityFields.map((field) => field.value).join(" ")} · Menunggu Validasi`;
+    MockMutationObserver.notify();
   };
+  save.onClick = () => saveDelayMs ? context.setTimeout(completeSave, saveDelayMs) : completeSave();
   context.document = doc;
   return { doc, panel, fields, save, edit, finish, setDate(value) { selectedDate = value; } };
 }
@@ -168,6 +185,37 @@ test("pending-validation entry can be verified without another save", async () =
   assert.equal(portal.doc.formOpen, false);
   assert.equal(portal.edit.clickCount, 1);
   assert.equal(portal.save.clickCount, 0);
+  assert.equal(portal.finish.clickCount, 0);
+});
+
+test("a delayed portal save is verified automatically instead of becoming a manual check", async () => {
+  const portal = mockPortal(undefined, {}, { saveDelayMs: 12_000 });
+  let saveMarker = 0;
+
+  const result = await context.LogpilotPortalAdapter.run(snapshot, {
+    checkpoint: async () => "continue",
+    markSaveAttempt: async () => { saveMarker += 1; },
+  });
+
+  assert.equal(result.outcome, "success", result.error);
+  assert.equal(saveMarker, 1);
+  assert.equal(portal.save.clickCount, 1);
+  assert.equal(portal.finish.clickCount, 0);
+});
+
+test("a verified save closes a leftover form without another save", async () => {
+  const portal = mockPortal(undefined, {}, { keepFormOpenOnSave: true });
+  let saveMarker = 0;
+
+  const result = await context.LogpilotPortalAdapter.run(snapshot, {
+    checkpoint: async () => "continue",
+    markSaveAttempt: async () => { saveMarker += 1; },
+  });
+
+  assert.equal(result.outcome, "success", result.error);
+  assert.equal(saveMarker, 1);
+  assert.equal(portal.save.clickCount, 1);
+  assert.equal(portal.doc.formOpen, false);
   assert.equal(portal.finish.clickCount, 0);
 });
 
