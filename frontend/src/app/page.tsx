@@ -344,7 +344,7 @@ export default function Home() {
                       value={startDate}
                       onChange={(event) => updateStart(event.target.value)}
                       aria-invalid={Boolean(error)}
-                      aria-describedby={error ? "range-error" : "range-hint"}
+                      aria-describedby={error ? "range-error" : undefined}
                     />
                   </label>
                   <label className="form-control w-full">
@@ -355,7 +355,7 @@ export default function Home() {
                       value={endDate}
                       onChange={(event) => updateEnd(event.target.value)}
                       aria-invalid={Boolean(error)}
-                      aria-describedby={error ? "range-error" : "range-hint"}
+                      aria-describedby={error ? "range-error" : undefined}
                     />
                   </label>
                 </div>
@@ -373,19 +373,14 @@ export default function Home() {
                   </button>
                 </div>
 
-                {error ? (
-                  <p id="range-error" role="alert" className="mt-3 text-sm font-medium text-error-content">{error}</p>
-                ) : (
-                  <p id="range-hint" className="mt-3 text-sm text-base-content/65">
-                    Tidak ada batas tanggal bawaan.
-                  </p>
-                )}
+                {error && <p id="range-error" role="alert" className="mt-3 text-sm font-medium text-error-content">{error}</p>}
 
                 <div className="mt-5 flex flex-wrap items-center gap-3">
                   <button type="submit" className="btn btn-primary">Terapkan periode</button>
                   {selectedRange && (
-                    <span role="status" className="text-sm text-base-content/70">
-                      {selectedRange.days} hari dipilih · {formatDate(selectedRange.start)}–{formatDate(selectedRange.end)}
+                    <span role="status" className="inline-flex max-w-full flex-wrap items-center gap-2 rounded-box border border-base-300 bg-base-200 px-3 py-2 text-sm leading-5 text-base-content/75">
+                      <span className="badge badge-outline shrink-0">{selectedRange.days} hari</span>
+                      <span>{formatDate(selectedRange.start)} sampai {formatDate(selectedRange.end)}</span>
                     </span>
                   )}
                 </div>
@@ -419,7 +414,7 @@ export default function Home() {
               {docsStatus?.configured && !docsStatus.connected && (
                 <button
                   type="button"
-                  className="btn btn-outline w-full"
+                  className="btn btn-primary w-full"
                   disabled={!apiAvailable || docsStatus.state === "connecting"}
                   onClick={connectGoogleDocs}
                 >
@@ -455,9 +450,6 @@ export default function Home() {
                 {syncError && <p role="alert" className="text-sm font-medium text-error-content">{syncError}</p>}
               </form>
 
-              <p className="text-xs leading-5 text-base-content/65">
-                Tanggal tanpa baris akan ditandai agar bisa kamu periksa.
-              </p>
             </div>
           </aside>
         </section>
@@ -489,7 +481,7 @@ export default function Home() {
                   <div>
                     <h2 id="coverage-title" className="card-title text-xl">Hasil pemeriksaan</h2>
                     <p className="mt-1 text-sm text-base-content/70">
-                      {formatDate(syncResult.start_date)} — {formatDate(syncResult.end_date)}
+                      {formatDate(syncResult.start_date)} sampai {formatDate(syncResult.end_date)}
                     </p>
                   </div>
                   <button type="button" className="btn btn-outline" onClick={exportCoverageCsv}>Ekspor CSV</button>
@@ -509,38 +501,40 @@ export default function Home() {
                   </div>
                 )}
 
-                <div className="overflow-x-auto">
-                  <table className="table min-w-[48rem]">
-                    <thead>
-                      <tr><th>Tanggal</th><th className="w-40">Status</th><th>Catatan</th></tr>
-                    </thead>
-                    <tbody>
-                      {syncResult.days.map((day) => (
-                        <tr key={day.date}>
-                          <td className="whitespace-nowrap font-medium">{formatDate(day.date)}</td>
-                          <td className="w-40 min-w-40 whitespace-nowrap"><span className="badge badge-outline inline-flex w-max shrink-0 whitespace-nowrap">{COVERAGE_LABELS[day.status]}</span></td>
-                          <td className="min-w-64 whitespace-normal">
-                            {day.entries.length ? day.entries.map((entry) => (
-                              <div key={`${day.date}-${entry.source_row_index}`} className="mb-3 last:mb-0">
-                                <p>{entry.activity ?? (entry.kind === "needs_mapping" ? "Kolom sumber perlu ditinjau." : "Baris tanggal belum diisi.")}</p>
-                                {entry.result && <p className="mt-1 text-sm text-base-content/70">Hasil: {entry.result}</p>}
-                                {entry.obstacle && <p className="mt-1 text-sm text-base-content/70">Kendala: {entry.obstacle}</p>}
-                                {entry.documentation_url && <p className="mt-1 break-all text-sm text-base-content/70">Dokumentasi: {entry.documentation_url}</p>}
-                                {entry.source_conflict && <p className="mt-1 text-sm font-medium text-warning-content">Catatan ini berubah di dokumen.</p>}
-                              </div>
-                            )) : (
-                              <span className="text-base-content/65">Tidak ada catatan pada tanggal ini.</span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                <p className="text-sm leading-6 text-base-content/70">
-                  Tanggal tanpa catatan belum tentu hari kerja yang terlewat. Cocokkan dengan jadwal magangmu.
-                </p>
+                <details className="rounded-box border border-base-300 bg-base-100">
+                  <summary className="disclosure-summary flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+                    <span>Lihat catatan per tanggal</span>
+                    <span className="badge badge-outline shrink-0">{syncResult.days.length} tanggal</span>
+                  </summary>
+                  <div className="overflow-x-auto border-t border-base-300 px-3 sm:px-4">
+                    <table className="table min-w-[48rem]">
+                      <thead>
+                        <tr><th>Tanggal</th><th className="w-40">Status</th><th>Catatan</th></tr>
+                      </thead>
+                      <tbody>
+                        {syncResult.days.map((day) => (
+                          <tr key={day.date}>
+                            <td className="whitespace-nowrap font-medium">{formatDate(day.date)}</td>
+                            <td className="w-40 min-w-40 whitespace-nowrap"><span className="badge badge-outline inline-flex w-max shrink-0 whitespace-nowrap">{COVERAGE_LABELS[day.status]}</span></td>
+                            <td className="min-w-64 whitespace-normal">
+                              {day.entries.length ? day.entries.map((entry) => (
+                                <div key={`${day.date}-${entry.source_row_index}`} className="mb-3 last:mb-0">
+                                  <p>{entry.activity ?? (entry.kind === "needs_mapping" ? "Kolom sumber perlu ditinjau." : "Baris tanggal belum diisi.")}</p>
+                                  {entry.result && <p className="mt-1 text-sm text-base-content/70">Hasil: {entry.result}</p>}
+                                  {entry.obstacle && <p className="mt-1 text-sm text-base-content/70">Kendala: {entry.obstacle}</p>}
+                                  {entry.documentation_url && <p className="mt-1 break-all text-sm text-base-content/70">Dokumentasi: {entry.documentation_url}</p>}
+                                  {entry.source_conflict && <p className="mt-1 text-sm font-medium text-warning-content">Catatan ini berubah di dokumen.</p>}
+                                </div>
+                              )) : (
+                                <span className="text-base-content/65">Tidak ada catatan pada tanggal ini.</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </details>
               </div>
             </div>
           </section>

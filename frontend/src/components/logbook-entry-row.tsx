@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import Image from "next/image";
+import { useEffect, useState } from "react";
 
 export type LogbookEntry = {
   id: string;
@@ -32,6 +33,7 @@ type Props = {
   onSave: (entryId: string, draft: EntryDraft, sourceReviewed: boolean) => Promise<LogbookEntry>;
   onApprove: (entryId: string) => Promise<LogbookEntry>;
   onGenerateResult: (entryId: string, activityText: string) => Promise<string>;
+  onDirtyChange?: (entryId: string, dirty: boolean) => void;
 };
 
 const TIME_24H = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
@@ -66,7 +68,7 @@ function displayDate(value: string) {
   }).format(new Date(`${value}T00:00:00Z`));
 }
 
-export function LogbookEntryRow({ entry, onSave, onApprove, onGenerateResult }: Props) {
+export function LogbookEntryRow({ entry, onSave, onApprove, onGenerateResult, onDirtyChange }: Props) {
   const [draft, setDraft] = useState(() => draftFrom(entry));
   const [sourceReviewed, setSourceReviewed] = useState(false);
   const [previousEntry, setPreviousEntry] = useState(entry);
@@ -105,7 +107,16 @@ export function LogbookEntryRow({ entry, onSave, onApprove, onGenerateResult }: 
             : entry.status === "needs_review"
               ? "Lengkapi dan simpan catatan yang perlu ditinjau."
               : "";
-  const statusLabel = dirty ? "Perubahan belum disimpan" : STATUS_LABELS[entry.status] ?? "Draf";
+  const approved = entry.entry_approved || entry.status === "approved";
+  const statusLabel = dirty
+    ? "Perubahan belum disimpan"
+    : entry.status === "submitted"
+      ? "Menunggu validasi"
+      : approved
+        ? "Disetujui"
+        : STATUS_LABELS[entry.status] ?? "Draf";
+
+  useEffect(() => onDirtyChange?.(entry.id, dirty), [entry.id, dirty, onDirtyChange]);
 
   function updateField(field: keyof EntryDraft, value: string) {
     setDraft((current) => ({ ...current, [field]: value }));
@@ -155,90 +166,89 @@ export function LogbookEntryRow({ entry, onSave, onApprove, onGenerateResult }: 
   }
 
   return (
-    <article className="grid gap-5 py-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
-      <div className="min-w-0 space-y-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="whitespace-nowrap font-medium">{displayDate(entry.date)}</p>
-          {entry.week_number && <span className="text-xs text-base-content/65">Minggu {entry.week_number}</span>}
-          <span className={`badge whitespace-nowrap ${dirty || entry.status === "needs_review" || entry.source_conflict ? "badge-warning" : entry.status === "approved" ? "badge-success" : "badge-outline"}`}>
-            {statusLabel}
-          </span>
+    <article className="min-w-0 space-y-6 px-2 py-2 sm:space-y-7 sm:px-4 sm:py-4">
+      <header className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <h3 className="text-lg font-semibold">{displayDate(entry.date)}</h3>
+        {entry.week_number && <span className="text-sm text-base-content/65">Minggu {entry.week_number}</span>}
+        <span className={`badge whitespace-nowrap ${dirty || entry.status === "needs_review" || entry.source_conflict || entry.status === "submitted" ? "badge-warning" : approved ? "badge-success" : "badge-outline"}`}>
+          {statusLabel}
+        </span>
+      </header>
+
+      {entry.status === "submitted" && dirty && (
+        <p className="text-sm text-base-content/70">Perubahan perlu disimpan dan disetujui ulang sebelum dikirim ke portal.</p>
+      )}
+
+      {entry.source_conflict && (
+        <div className="rounded-box bg-warning/40 p-4">
+          <p className="text-sm font-medium">Teks dari dokumen sumber</p>
+          <p className="mt-1 whitespace-pre-wrap text-sm leading-6">{entry.original_activity || "Kolom kegiatan belum dikenali pada dokumen."}</p>
         </div>
-        {entry.status === "submitted" && (
-          <p className="text-sm leading-6 text-base-content/70">Entri ini sudah ada di portal. Perubahan akan dikirim setelah disimpan dan disetujui ulang.</p>
-        )}
+      )}
 
-        <details className="collapse collapse-arrow rounded-box bg-base-200">
-          <summary className="collapse-title min-h-0 py-2 text-sm font-medium">Teks dari dokumen</summary>
-          <div className="collapse-content whitespace-pre-wrap text-sm leading-6">
-            {entry.original_activity || "Kolom kegiatan belum dikenali pada dokumen."}
+      <label className="form-control gap-1">
+        <span className="label py-1"><span className="label-text text-sm font-medium">Uraian kegiatan</span></span>
+        <textarea className="textarea textarea-bordered min-h-28 w-full bg-base-100" value={draft.activity_text} disabled={isReadOnly || generatingResult} maxLength={10000} onChange={(event) => updateField("activity_text", event.target.value)} />
+      </label>
+
+      <div className="grid gap-5 sm:grid-cols-2 sm:gap-6">
+        <div className="form-control min-w-0 gap-1">
+          <div className="label w-full min-w-0 flex-wrap justify-between gap-3 py-1">
+            <span className="label-text text-sm font-medium">Hasil</span>
+            {!isReadOnly && (
+              <button type="button" aria-label="Buat hasil dengan AI menggunakan Groq" className="btn btn-secondary btn-sm min-h-11 gap-2 border border-primary/20 px-3" disabled={!draft.activity_text.trim() || generatingResult || saving || approving} onClick={generateResult}>
+                <Image src="/groq-mark.svg" width={18} height={28} alt="" aria-hidden="true" unoptimized className="h-7 w-[18px] shrink-0 object-contain" />
+                <span>{generatingResult ? "Membuat…" : "Buat dengan AI"}</span>
+              </button>
+            )}
           </div>
-        </details>
-
-        <label className="form-control">
-          <span className="label py-1"><span className="label-text text-xs font-medium">Uraian kegiatan</span></span>
-          <textarea className="textarea textarea-bordered min-h-20 w-full bg-base-100" value={draft.activity_text} disabled={isReadOnly || generatingResult} maxLength={10000} onChange={(event) => updateField("activity_text", event.target.value)} />
+          <textarea className="textarea textarea-bordered min-h-28 w-full bg-base-100" value={draft.result_text} disabled={isReadOnly} maxLength={5000} onChange={(event) => updateField("result_text", event.target.value)} />
+        </div>
+        <label className="form-control min-w-0 gap-1">
+          <span className="label py-1"><span className="label-text text-sm font-medium">Kendala</span></span>
+          <textarea className="textarea textarea-bordered min-h-28 w-full bg-base-100" value={draft.obstacle_text} disabled={isReadOnly} maxLength={5000} onChange={(event) => updateField("obstacle_text", event.target.value)} />
         </label>
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="form-control min-w-0">
-            <div className="label min-w-0 flex-wrap justify-between gap-2 py-1">
-              <span className="label-text text-xs font-medium">Hasil</span>
-              {!isReadOnly && (
-                <button type="button" className="btn btn-ghost btn-xs" disabled={!draft.activity_text.trim() || generatingResult || saving || approving} onClick={generateResult}>
-                  {generatingResult ? "Membuat…" : "Buat dengan AI"}
-                </button>
-              )}
-            </div>
-            <textarea className="textarea textarea-bordered min-h-20 w-full bg-base-100" value={draft.result_text} disabled={isReadOnly} maxLength={5000} onChange={(event) => updateField("result_text", event.target.value)} />
-          </div>
-          <label className="form-control min-w-0">
-            <span className="label py-1"><span className="label-text text-xs font-medium">Kendala</span></span>
-            <textarea className="textarea textarea-bordered min-h-20 w-full bg-base-100" value={draft.obstacle_text} disabled={isReadOnly} maxLength={5000} onChange={(event) => updateField("obstacle_text", event.target.value)} />
-          </label>
-        </div>
-
-        {entry.source_conflict && (
-          <label className="label cursor-pointer justify-start gap-3 whitespace-normal">
-            <input type="checkbox" className="checkbox checkbox-warning" checked={sourceReviewed} onChange={(event) => setSourceReviewed(event.target.checked)} />
-            <span className="label-text text-sm">Saya sudah meninjau perubahan pada dokumen sumber.</span>
-          </label>
-        )}
       </div>
 
-      <div className="min-w-0 space-y-4 lg:border-l lg:border-base-300 lg:pl-5">
-        <div className="grid grid-cols-2 gap-3">
-          <label className="form-control min-w-0">
-            <span className="label py-1"><span className="label-text text-xs">Mulai</span></span>
-            <input className="input input-bordered w-full bg-base-100" type="text" inputMode="text" placeholder="09:00" maxLength={5} value={draft.start_time} disabled={isReadOnly} onChange={(event) => updateField("start_time", event.target.value)} />
-          </label>
-          <label className="form-control min-w-0">
-            <span className="label py-1"><span className="label-text text-xs">Selesai</span></span>
-            <input className="input input-bordered w-full bg-base-100" type="text" inputMode="text" placeholder="17:00" maxLength={5} value={draft.end_time} disabled={isReadOnly} onChange={(event) => updateField("end_time", event.target.value)} />
-          </label>
-        </div>
-        <p className="-mt-2 text-xs text-base-content/65">Format 24 jam: HH:MM.</p>
-        <label className="form-control">
-          <span className="label py-1"><span className="label-text text-xs font-medium">Dokumentasi</span></span>
-          <input className="input input-bordered min-w-0 w-full bg-base-100" type="url" placeholder="Tautan dokumentasi" value={draft.documentation_url} disabled={isReadOnly} maxLength={2048} onChange={(event) => updateField("documentation_url", event.target.value)} />
-          <span className="label py-1"><span className="label-text-alt">Tautan ini dapat menggantikan bawaan untuk entri ini.</span></span>
+      <section aria-label="Jam kerja dan dokumentasi" className="grid gap-5 border-t border-base-300 pt-6 sm:grid-cols-2 sm:gap-6">
+        <label className="form-control min-w-0 gap-1">
+          <span className="label py-1"><span className="label-text text-sm font-medium">Mulai</span></span>
+          <input className="input input-bordered w-full bg-base-100" type="text" inputMode="text" placeholder="09:00" maxLength={5} value={draft.start_time} disabled={isReadOnly} onChange={(event) => updateField("start_time", event.target.value)} />
         </label>
+        <label className="form-control min-w-0 gap-1">
+          <span className="label py-1"><span className="label-text text-sm font-medium">Selesai</span></span>
+          <input className="input input-bordered w-full bg-base-100" type="text" inputMode="text" placeholder="17:00" maxLength={5} value={draft.end_time} disabled={isReadOnly} onChange={(event) => updateField("end_time", event.target.value)} />
+        </label>
+        <p className="-mt-2 text-xs text-base-content/65 sm:col-span-2">Format 24 jam: HH:MM.</p>
+        <label className="form-control min-w-0 gap-1 sm:col-span-2">
+          <span className="label py-1"><span className="label-text text-sm font-medium">Dokumentasi</span></span>
+          <input className="input input-bordered min-w-0 w-full bg-base-100" type="url" placeholder="Tautan dokumentasi" value={draft.documentation_url} disabled={isReadOnly} maxLength={2048} onChange={(event) => updateField("documentation_url", event.target.value)} />
+        </label>
+      </section>
 
-        {entry.source_conflict && <p className="text-sm text-warning-content">Sumber berubah. Periksa teks sebelum menyetujui.</p>}
-        {error && <p role="alert" className="text-sm text-error-content">{error}</p>}
-        {saved && <p role="status" className="text-sm text-success-content">Perubahan tersimpan.</p>}
-        {!isReadOnly && (
-          <div className="space-y-2 pt-1">
-            <button type="button" className="btn btn-outline w-full" disabled={!dirty || saving || generatingResult} onClick={save}>
+      {entry.source_conflict && (
+        <label className="label cursor-pointer justify-start gap-3 whitespace-normal">
+          <input type="checkbox" className="checkbox checkbox-warning" checked={sourceReviewed} onChange={(event) => setSourceReviewed(event.target.checked)} />
+          <span className="label-text text-sm">Saya sudah meninjau perubahan pada dokumen sumber.</span>
+        </label>
+      )}
+      {error && <p role="alert" className="text-sm text-error-content">{error}</p>}
+      {saved && <p role="status" className="text-sm text-success-content">Perubahan tersimpan.</p>}
+      {!isReadOnly && (
+        <div className="flex flex-wrap items-center gap-3 border-t border-base-300 pt-6">
+          {dirty && (
+            <button type="button" className="btn btn-primary" disabled={saving || generatingResult} onClick={save}>
               {saving ? "Menyimpan…" : "Simpan perubahan"}
             </button>
-            <button type="button" className="btn btn-primary w-full" disabled={Boolean(validation) || approving || entry.entry_approved || generatingResult} onClick={approve}>
-              {approving ? "Menyetujui…" : entry.entry_approved ? "Sudah disetujui" : "Setujui entri"}
+          )}
+          {!approved && !dirty && (
+            <button type="button" className="btn btn-primary" disabled={Boolean(validation) || approving || generatingResult} onClick={approve}>
+              {approving ? "Menyetujui…" : "Setujui entri"}
             </button>
-            {validation && !entry.entry_approved && <p className="text-xs leading-5 text-base-content/65">{validation}</p>}
-          </div>
-        )}
-      </div>
+          )}
+          {!approved && !dirty && validation && <p className="text-sm leading-5 text-base-content/65">{validation}</p>}
+        </div>
+      )}
     </article>
   );
 }
