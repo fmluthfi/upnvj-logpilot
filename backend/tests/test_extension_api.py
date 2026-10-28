@@ -18,6 +18,9 @@ from app.api.extension import (
     pair_extension,
     report_entry,
     mark_save_attempted,
+    latest_job,
+    retry_extension_job,
+    unpair_extension,
 )
 from app.api.runs import Confirmation, StartRequest, control_extension_run, prepare_run, retry_failed
 from app.db.base import Base
@@ -113,6 +116,7 @@ class ExtensionApiTests(unittest.TestCase):
 
         self.assertEqual(claimed["run_id"], run["id"])
         self.assertEqual(claimed["entry"]["activity_text"], "Membuat halaman fasilitas.")
+        self.assertFalse(claimed["save_attempted"])
         self.assertIsNone(second)
 
     def test_repeated_claim_from_the_same_worker_recovers_the_active_entry(self):
@@ -256,6 +260,87 @@ class ExtensionApiTests(unittest.TestCase):
             mark_save_attempted(run["id"], claimed["run_entry_id"], request, authorization=authorization, session=self.session)
 
         self.assertEqual(error.exception.status_code, 409)
+
+    def test_pause_report_requeues_claim_without_marking_failure(self):
+        run = self.prepare()
+        token = self.pair()
+        authorization = f"Bearer {token}"
+        claim = claim_next_entry(WorkerRequest(worker_id="extension-a"), authorization=authorization, session=self.session)
+
+        result = report_entry(
+            run["id"], claim["run_entry_id"],
+            ReportRequest(worker_id="extension-a", outcome="paused"),
+            authorization=authorization, session=self.session,
+        )
+
+        item = self.session.query(AutomationRunEntry).filter_by(run_id=run["id"]).one()
+        self.session.refresh(self.entry)
+        self.assertEqual(result["status"], "paused")
+        self.assertEqual(item.status, "queued")
+        self.assertIsNone(item.claimed_by)
+        self.assertEqual(self.entry.status, "approved")
+
+    def test_stop_report_releases_unsubmitted_entry_as_retryable(self):
+        run = self.prepare()
+        token = self.pair()
+        authorization = f"Bearer {token}"
+        claim = claim_next_entry(WorkerRequest(worker_id="extension-a"), authorization=authorization, session=self.session)
+        control_extension_run(self.session, self.session.get(AutomationRun, run["id"]), "stop")
+
+        result = report_entry(
+            run["id"], claim["run_entry_id"],
+            ReportRequest(worker_id="extension-a", outcome="stopped"),
+            authorization=authorization, session=self.session,
+        )
+
+        item = self.session.query(AutomationRunEntry).filter_by(run_id=run["id"]).one()
+        self.session.refresh(self.entry)
+        self.assertEqual(result["status"], "stopped")
+        self.assertEqual(item.status, "stopped")
+        self.assertTrue(item.safe_to_retry)
+        self.assertEqual(self.entry.status, "approved")
+
+    def test_latest_job_requires_pairing_and_returns_extension_batch(self):
+        run = self.prepare()
+        token = self.pair()
+
+        result = latest_job(authorization=f"Bearer {token}", session=self.session)
+
+        self.assertEqual(result["id"], run["id"])
+        with self.assertRaises(HTTPException) as error:
+            latest_job(authorization=None, session=self.session)
+        self.assertEqual(error.exception.status_code, 401)
+
+    def test_retry_extension_job_requires_pairing_and_uses_extension_runner(self):
+        run = self.prepare()
+        token = self.pair()
+        authorization = f"Bearer {token}"
+        claim = claim_next_entry(WorkerRequest(worker_id="extension-a"), authorization=authorization, session=self.session)
+        report_entry(
+            run["id"], claim["run_entry_id"],
+            ReportRequest(worker_id="extension-a", outcome="failed"),
+            authorization=authorization, session=self.session,
+        )
+
+        result = retry_extension_job(
+            run["id"], Confirmation(confirmed=True), authorization=authorization, session=self.session,
+        )
+
+        self.assertEqual(result["status"], "ready")
+        self.assertEqual(result["counts"]["queued"], 1)
+        with self.assertRaises(HTTPException) as error:
+            retry_extension_job(run["id"], Confirmation(confirmed=True), authorization=None, session=self.session)
+        self.assertEqual(error.exception.status_code, 401)
+
+    def test_unpair_is_rejected_while_an_extension_batch_is_active(self):
+        run = self.prepare()
+        token = self.pair()
+
+        with self.assertRaises(HTTPException) as error:
+            unpair_extension(authorization=f"Bearer {token}", session=self.session)
+
+        self.assertEqual(error.exception.status_code, 409)
+        self.assertTrue(self.session.get(LogbookSettings, "local").extension_token_hash)
 
 
 if __name__ == "__main__":

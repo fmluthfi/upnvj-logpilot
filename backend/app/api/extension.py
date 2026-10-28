@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.runs import _RUN_LOCK, _get_run, _refresh_extension_run, _run_payload, control_extension_run
+from app.api.runs import ACTIVE_STATUSES, Confirmation, _RUN_LOCK, _get_run, _refresh_extension_run, _retry_failed, _run_payload, control_extension_run
 from app.db.models import AutomationRun, AutomationRunEntry, LogbookEntry, LogbookSettings
 from app.db.session import get_db
 
@@ -34,7 +34,7 @@ class SaveAttemptRequest(WorkerRequest):
 
 
 class ReportRequest(WorkerRequest):
-    outcome: Literal["success", "failed", "skipped", "unknown", "already_present"]
+    outcome: Literal["success", "failed", "skipped", "unknown", "already_present", "paused", "stopped"]
     error: str | None = Field(default=None, max_length=1000)
 
 
@@ -110,6 +110,12 @@ def unpair_extension(
 
 def _unpair_extension(authorization: str | None, session: Session) -> dict:
     settings = _authenticate(session, authorization)
+    active_run = session.scalar(select(AutomationRun.id).where(
+        AutomationRun.runner == "extension",
+        AutomationRun.status.in_(ACTIVE_STATUSES),
+    ).limit(1))
+    if active_run:
+        raise HTTPException(status_code=409, detail="Hentikan atau selesaikan batch extension sebelum memutuskan pairing.")
     settings.extension_token_hash = None
     settings.extension_token_created_at = None
     settings.extension_pairing_code_hash = None
@@ -125,6 +131,18 @@ def extension_status(
 ) -> dict:
     settings = _authenticate(session, authorization)
     return {"paired": True, "paired_at": settings.extension_token_created_at.isoformat() if settings.extension_token_created_at else None}
+
+
+@router.get("/jobs/latest")
+def latest_job(
+    authorization: str | None = Header(default=None),
+    session: Session = Depends(get_db),
+) -> dict | None:
+    _authenticate(session, authorization)
+    run = session.scalar(select(AutomationRun).where(
+        AutomationRun.runner == "extension",
+    ).order_by(AutomationRun.created_at.desc(), AutomationRun.id.desc()).limit(1))
+    return _run_payload(session, run) if run else None
 
 
 @router.get("/jobs/{run_id}")
@@ -220,7 +238,9 @@ def _report_entry(run_id: str, run_entry_id: str, request: ReportRequest, author
     ))
     if item is None:
         raise HTTPException(status_code=404, detail="Entri batch tidak ditemukan.")
-    if item.status in {"submitted", "failed", "skipped", "stopped", "verification_needed"}:
+    if item.status in {"submitted", "failed", "skipped", "stopped", "verification_needed"} or (
+        item.status == "queued" and request.outcome == "paused"
+    ):
         if _same_outcome(item.status, request.outcome):
             return _run_payload(session, run)
         raise HTTPException(status_code=409, detail="Hasil entri sudah tercatat dan tidak dapat diganti.")
@@ -263,6 +283,19 @@ def _report_entry(run_id: str, run_entry_id: str, request: ReportRequest, author
         entry.status = "needs_review"
         entry.entry_approved = False
         entry.last_error = item.last_error
+    elif request.outcome == "paused" and not item.save_attempted:
+        item.status = "queued"
+        item.last_error = None
+        entry.status = "approved"
+        run.pause_requested = True
+    elif request.outcome == "stopped" and not item.save_attempted:
+        item.status = "stopped"
+        item.safe_to_retry = True
+        item.last_error = "Batch dihentikan sebelum upaya Simpan."
+        entry.status = "approved"
+        entry.last_error = item.last_error
+        run.stop_requested = True
+        run.pause_requested = False
     elif request.outcome == "failed" and not item.save_attempted:
         item.status = "failed"
         item.safe_to_retry = True
@@ -275,7 +308,7 @@ def _report_entry(run_id: str, run_entry_id: str, request: ReportRequest, author
         item.last_error = request.error or "Automation berhenti sebelum Simpan. Entri aman untuk ditinjau dan dicoba ulang."
         entry.status = "approved"
         entry.last_error = item.last_error
-    elif request.outcome in {"failed", "unknown", "skipped"}:
+    elif request.outcome in {"failed", "unknown", "skipped", "paused", "stopped"}:
         _mark_verification_needed(session, run, item, entry, request.error or "Hasil Simpan belum dapat dipastikan. Periksa portal sebelum mencoba ulang.")
 
     item.claimed_by = None
@@ -295,6 +328,21 @@ def control_job(
     with _RUN_LOCK:
         _authenticate(session, authorization)
         return control_extension_run(session, _get_run(session, run_id), request.action)
+
+
+@router.post("/jobs/{run_id}/retry-failed")
+def retry_extension_job(
+    run_id: str,
+    request: Confirmation,
+    authorization: str | None = Header(default=None),
+    session: Session = Depends(get_db),
+) -> dict:
+    with _RUN_LOCK:
+        _authenticate(session, authorization)
+        run = _get_run(session, run_id)
+        if run.runner != "extension":
+            raise HTTPException(status_code=409, detail="Run ini bukan batch extension.")
+        return _retry_failed(run_id, request, session)
 
 
 def _claim_next_entry(request: WorkerRequest, session: Session) -> dict | None:
@@ -324,6 +372,8 @@ def _claim_next_entry(request: WorkerRequest, session: Session) -> dict | None:
                         entry.status = "approved"
                 else:
                     owned.status = "queued"
+                    if entry and entry.status == "processing":
+                        entry.status = "approved"
             _refresh_extension_run(session, run)
             session.commit()
             return None
@@ -405,6 +455,7 @@ def _claim_payload(run: AutomationRun, item: AutomationRunEntry) -> dict:
         "run_id": run.id,
         "run_entry_id": item.id,
         "entry_id": item.entry_id,
+        "save_attempted": item.save_attempted,
         "lease_expires_at": item.lease_expires_at.isoformat() if item.lease_expires_at else None,
         "entry": json.loads(item.snapshot_json or "{}"),
     }
@@ -475,4 +526,6 @@ def _same_outcome(status: str, outcome: str) -> bool:
         ("verification_needed", "failed"),
         ("verification_needed", "skipped"),
         ("verification_needed", "unknown"),
+        ("queued", "paused"),
+        ("stopped", "stopped"),
     }

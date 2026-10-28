@@ -4,7 +4,7 @@
   "description": "Penghubung aman antara dashboard Logpilot dan portal logbook UPNVJ.",
   "version": "0.1.0",
   "minimum_chrome_version": "102",
-  "permissions": ["storage"],
+  "permissions": ["storage", "alarms"],
   "host_permissions": [
     "https://kampusberdampak.upnvj.ac.id/*",
     "http://127.0.0.1:8000/*"
@@ -25,7 +25,11 @@
   "content_scripts": [
     {
       "matches": ["https://kampusberdampak.upnvj.ac.id/logbook-harian*"],
-      "js": ["dist/content/sberdampak.js"],
+      "js": [
+        "dist/automation/safety.js",
+        "dist/automation/portal-adapter.js",
+        "dist/content/sberdampak.js"
+      ],
       "run_at": "document_idle"
     }
   ],

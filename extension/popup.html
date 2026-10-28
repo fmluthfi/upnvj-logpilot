@@ -26,6 +26,24 @@
         <button id="open-portal-button" class="button button-outline" type="button">Buka halaman logbook</button>
       </section>
 
+      <section class="run-panel" aria-labelledby="run-heading">
+        <div class="panel-heading">
+          <h2 id="run-heading">Batch automation</h2>
+          <span id="run-status" class="status-badge">Belum ada batch</span>
+        </div>
+        <p id="run-range">Siapkan batch dari dashboard Logpilot.</p>
+        <progress id="run-progress" max="100" value="0" aria-label="Progres automation"></progress>
+        <p id="run-summary" class="run-summary">Belum ada entri untuk diproses.</p>
+        <p id="run-current" class="run-current" hidden></p>
+        <div class="run-controls" aria-label="Kontrol batch">
+          <button id="start-button" class="button button-primary" type="button" hidden>Mulai automation</button>
+          <button id="pause-button" class="button button-outline" type="button" hidden>Jeda</button>
+          <button id="resume-button" class="button button-primary" type="button" hidden>Lanjutkan</button>
+          <button id="stop-button" class="button button-outline" type="button" hidden>Hentikan</button>
+          <button id="retry-button" class="button button-outline" type="button" hidden>Coba entri gagal lagi</button>
+        </div>
+      </section>
+
       <section id="connect-section" class="connect-panel" aria-labelledby="connect-heading">
         <h2 id="connect-heading">Hubungkan ekstensi</h2>
         <p>Masukkan kode sementara yang dibuat dari dashboard Logpilot.</p>
