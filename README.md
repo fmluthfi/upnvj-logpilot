@@ -2,9 +2,9 @@
   <img src="frontend/public/logpilot-mark.png" alt="Logo Logpilot" width="112">
 </p>
 
-<h1 align="center">Logpilot</h1>
+<h1 align="center">Logpilot: Otomatisasi Logbook Magang UPNVJ</h1>
 
-<p align="center">Siapkan, tinjau, dan isi logbook magang UPNVJ dari catatan Google Docs.</p>
+<p align="center">Otomatisasi pengisian entri harian dari Google Docs ke portal Kampus Berdampak.</p>
 
 <p align="center">
   <a href="#mulai-cepat">Mulai cepat</a> ·
@@ -14,7 +14,7 @@
   <a href="#jika-ada-masalah">Bantuan</a>
 </p>
 
-Logpilot berjalan di komputer pengguna. Dashboard membaca Google Docs, menampilkan catatan per tanggal, dan menyiapkan entri yang disetujui. Chrome extension mengisi serta menyimpan entri harian melalui sesi portal yang sudah dibuka pengguna.
+Logpilot berjalan di komputer pengguna. Setelah catatan Google Docs ditinjau dan disetujui, Chrome extension mengisi serta menyimpan entri harian melalui sesi portal yang sudah dibuka pengguna.
 
 **Batas penting:** Logpilot tidak menekan tombol **Selesaikan Logbook Magang**. Penyelesaian logbook dilakukan sendiri di portal.
 
