@@ -1,0 +1,54 @@
+@import "tailwindcss";
+
+@plugin "daisyui" {
+  themes: logpilot --default;
+}
+
+@plugin "daisyui/theme" {
+  name: "logpilot";
+  default: true;
+  color-scheme: light;
+
+  --color-base-100: #fffefb;
+  --color-base-200: #f2f5f2;
+  --color-base-300: #dce5df;
+  --color-base-content: #18352e;
+  --color-primary: #126b57;
+  --color-primary-content: #f3fff8;
+  --color-secondary: #dcefe3;
+  --color-secondary-content: #1c4938;
+  --color-accent: #d77a38;
+  --color-accent-content: #321a0c;
+  --color-neutral: #203a33;
+  --color-neutral-content: #f4f7f3;
+  --color-info: #d6eef3;
+  --color-info-content: #173b43;
+  --color-success: #dcefe1;
+  --color-success-content: #214b34;
+  --color-warning: #fff0d1;
+  --color-warning-content: #563817;
+  --color-error: #f8dddd;
+  --color-error-content: #682525;
+  --radius-selector: 0.75rem;
+  --radius-field: 0.8rem;
+  --radius-box: 1.2rem;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+}
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  min-height: 100vh;
+  background: var(--color-base-200);
+  color: var(--color-base-content);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+::selection {
+  background: #c8e8d6;
+  color: #17352e;
+}
