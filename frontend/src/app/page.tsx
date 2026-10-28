@@ -371,7 +371,7 @@ export default function Home() {
                 </div>
 
                 {error ? (
-                  <p id="range-error" role="alert" className="mt-3 text-sm font-medium text-error">{error}</p>
+                  <p id="range-error" role="alert" className="mt-3 text-sm font-medium text-error-content">{error}</p>
                 ) : (
                   <p id="range-hint" className="mt-3 text-sm text-base-content/65">
                     Tidak ada batas tanggal bawaan.
@@ -449,7 +449,7 @@ export default function Home() {
                 >
                   {syncing ? "Membaca dokumen…" : "Periksa rentang tanggal"}
                 </button>
-                {syncError && <p role="alert" className="text-sm font-medium text-error">{syncError}</p>}
+                {syncError && <p role="alert" className="text-sm font-medium text-error-content">{syncError}</p>}
               </form>
 
               <p className="text-xs leading-5 text-base-content/65">
@@ -466,12 +466,12 @@ export default function Home() {
               refreshKey={entriesRefreshKey}
             />
             <WeeklyReflectionEditor
-              key={`${selectedRange.start}|${selectedRange.end}`}
+              key={`reflection:${selectedRange.start}|${selectedRange.end}`}
               range={{ start: selectedRange.start, end: selectedRange.end }}
               refreshKey={entriesRefreshKey}
             />
             <PortalAutomation
-              key={`${selectedRange.start}|${selectedRange.end}`}
+              key={`automation:${selectedRange.start}|${selectedRange.end}`}
               range={{ start: selectedRange.start, end: selectedRange.end }}
               onRefresh={refreshEntries}
             />
@@ -515,7 +515,7 @@ export default function Home() {
                       {syncResult.days.map((day) => (
                         <tr key={day.date}>
                           <td className="whitespace-nowrap font-medium">{formatDate(day.date)}</td>
-                          <td className="w-40 whitespace-nowrap"><span className="badge badge-outline whitespace-nowrap">{COVERAGE_LABELS[day.status]}</span></td>
+                          <td className="w-40 min-w-40 whitespace-nowrap"><span className="badge badge-outline inline-flex w-max shrink-0 whitespace-nowrap">{COVERAGE_LABELS[day.status]}</span></td>
                           <td className="min-w-64 whitespace-normal">
                             {day.entries.length ? day.entries.map((entry) => (
                               <div key={`${day.date}-${entry.source_row_index}`} className="mb-3 last:mb-0">

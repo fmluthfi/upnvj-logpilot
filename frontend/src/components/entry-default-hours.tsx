@@ -208,7 +208,7 @@ export function EntryDefaultHours({ range, eligibleCount, documentationEligibleC
           </div>
         )}
 
-        {error && <p role="alert" className="mt-3 text-sm text-error">{error}</p>}
+        {error && <p role="alert" className="mt-3 text-sm text-error-content">{error}</p>}
         {message && <p role="status" className="mt-3 text-sm text-success-content">{message}</p>}
       </div>
     </details>

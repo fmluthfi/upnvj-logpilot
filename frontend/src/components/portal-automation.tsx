@@ -76,7 +76,9 @@ export function PortalAutomation({ range, onRefresh }: { range: DateRange; onRef
           setRun(latest);
         }
       })
-      .catch(() => undefined);
+      .catch(() => {
+        if (active) setError("Status automation belum dapat dimuat. Pastikan backend berjalan, lalu muat ulang dashboard.");
+      });
     return () => { active = false; };
   }, [range.start, range.end]);
 
@@ -105,9 +107,16 @@ export function PortalAutomation({ range, onRefresh }: { range: DateRange; onRef
   }, [runId, runStatus, onRefresh]);
 
   async function requestJson(url: string, init?: RequestInit) {
-    const response = await fetch(`${API_BASE}${url}`, init);
-    if (!response.ok) throw new Error(await apiError(response, "Permintaan belum dapat diproses."));
-    return response.json();
+    try {
+      const response = await fetch(`${API_BASE}${url}`, init);
+      if (!response.ok) throw new Error(await apiError(response, "Permintaan belum dapat diproses."));
+      return response.json();
+    } catch (requestError) {
+      if (requestError instanceof TypeError) {
+        throw new Error("Permintaan ke backend lokal gagal. Mulai ulang aplikasi agar pembaruan database diterapkan. Jika masih terjadi, periksa pesan di jendela backend.");
+      }
+      throw requestError;
+    }
   }
 
   async function inspectEntries() {
@@ -230,7 +239,7 @@ export function PortalAutomation({ range, onRefresh }: { range: DateRange; onRef
               {run.status === "waiting_login" && (
                 <p className="mt-3 text-sm leading-6 text-base-content/75">Masuk ke akun kampus pada jendela browser yang terbuka. Automation akan melanjutkan setelah halaman logbook tampil.</p>
               )}
-              {run.last_error && <p role="alert" className="mt-3 text-sm text-error">{run.last_error}</p>}
+              {run.last_error && <p role="alert" className="mt-3 text-sm text-error-content">{run.last_error}</p>}
               {run.entries.some((entry) => entry.status === "verification_needed") && (
                 <div className="mt-4 space-y-3">
                   <p className="text-sm leading-6">Periksa tanggal berikut pada portal. Pilih hasil setelah memastikan apakah entri sudah tersimpan.</p>
@@ -288,9 +297,9 @@ export function PortalAutomation({ range, onRefresh }: { range: DateRange; onRef
                   )}
                   {preview.ready_count > 0 && (
                     <div className="space-y-3 border-t border-base-300 pt-4">
-                      <label className="label cursor-pointer justify-start gap-3">
-                        <input type="checkbox" className="checkbox checkbox-primary" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />
-                        <span className="label-text leading-6">Saya sudah meninjau tanggal di atas dan menyetujui Logpilot mengisi serta menyimpan entri tersebut.</span>
+                      <label className="label cursor-pointer items-start justify-start gap-3 whitespace-normal">
+                        <input type="checkbox" className="checkbox checkbox-primary mt-1 shrink-0" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />
+                        <span className="label-text min-w-0 flex-1 whitespace-normal break-words leading-6">Saya sudah meninjau tanggal di atas dan menyetujui Logpilot mengisi serta menyimpan entri tersebut.</span>
                       </label>
                       <button type="button" className="btn btn-primary" disabled={!confirmed || busy} onClick={start}>
                         {busy ? "Membuka browser…" : "Mulai isi logbook"}
@@ -302,7 +311,7 @@ export function PortalAutomation({ range, onRefresh }: { range: DateRange; onRef
             </div>
           )}
 
-          {error && <p role="alert" className="text-sm text-error">{error}</p>}
+          {error && <p role="alert" className="text-sm text-error-content">{error}</p>}
         </div>
       </div>
     </section>

@@ -283,7 +283,7 @@ export function WeeklyReflectionEditor({ range, refreshKey }: Props) {
                 <span className="label-text text-sm">Saya telah meninjau catatan dan memastikan isinya aman dikirim ke GroqCloud.</span>
               </label>
 
-              {actionError && <p role="alert" className="text-sm text-error">{actionError}</p>}
+              {actionError && <p role="alert" className="text-sm text-error-content">{actionError}</p>}
               <div className="flex flex-wrap items-center gap-2">
                 <button type="button" className="btn btn-primary btn-sm" disabled={!privacyConfirmed || !hasFacts || data.has_conflicts || busy !== ""} onClick={generate}>
                   {busy === "generate" ? "Membuat draf…" : data.reflection_text && !data.stale ? "Buat ulang draf" : "Buat draf dengan GroqCloud"}

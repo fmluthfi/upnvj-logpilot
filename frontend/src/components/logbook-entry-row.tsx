@@ -222,7 +222,7 @@ export function LogbookEntryRow({ entry, onSave, onApprove, onGenerateResult }: 
         </label>
 
         {entry.source_conflict && <p className="text-sm text-warning-content">Sumber berubah. Periksa teks sebelum menyetujui.</p>}
-        {error && <p role="alert" className="text-sm text-error">{error}</p>}
+        {error && <p role="alert" className="text-sm text-error-content">{error}</p>}
         {saved && <p role="status" className="text-sm text-success-content">Perubahan tersimpan.</p>}
         {!isReadOnly && (
           <div className="space-y-2 pt-1">

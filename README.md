@@ -17,7 +17,7 @@ Clone repository, lalu jalankan PowerShell dari folder proyek:
     cd upnvj-logpilot
     .\scripts\setup.ps1
 
-Setup membuat virtual environment Python, memasang kebutuhan backend dan frontend, memasang Chromium untuk Playwright, menyalin `backend/.env.example` menjadi `backend/.env` jika belum ada, membuat database lokal, dan menjalankan migrasi SQLite. Setup tidak mengubah file sumber logbook.
+Setup membuat virtual environment Python, memasang kebutuhan backend dan frontend, memasang Chromium untuk Playwright, menyalin `backend/.env.example` menjadi `backend/.env` jika belum ada, membuat database lokal, dan menjalankan migrasi SQLite. Backend juga memeriksa migrasi sebelum mulai agar database mengikuti versi aplikasi. Setup tidak mengubah file sumber logbook.
 
 Setelah setup selesai, jalankan:
 
