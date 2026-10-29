@@ -271,7 +271,7 @@ export default function Home() {
   async function syncUploadedFile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selectedRange || !uploadFile) {
-      setUploadError("Pilih rentang tanggal dan file PDF atau Word terlebih dahulu.");
+      setUploadError("Pilih rentang tanggal dan dokumen terlebih dahulu.");
       return;
     }
     if (uploadFile.size > 10 * 1024 * 1024) {
@@ -344,7 +344,7 @@ export default function Home() {
             Otomasi Pengisian Logbook Magang UPNVJ
           </h1>
           <p className="mt-3 max-w-2xl text-base leading-7 text-base-content/75">
-            Siapkan catatan dari Google Docs, PDF, atau Word untuk rentang tanggal yang kamu pilih sebelum mengisi logbook.
+            Siapkan catatan dari Google Docs atau unggah PDF, Word, dan Excel untuk rentang tanggal yang kamu pilih sebelum mengisi logbook.
           </p>
 
           <div role="note" className="alert alert-warning mt-6 items-start">
@@ -436,11 +436,14 @@ export default function Home() {
               <form className="grid gap-4" onSubmit={syncGoogleDocs}>
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <h3 className="font-semibold">Google Docs</h3>
-                  {docsStatus?.connected && <span className="badge badge-success">Terhubung</span>}
-                  {docsStatus?.state === "connecting" && <span className="badge badge-info">Menunggu izin</span>}
+                  <div className="flex flex-wrap items-center gap-2">
+                    {docsStatus?.connected && <span className="badge badge-success">Terhubung</span>}
+                    {docsStatus?.state === "connecting" && <span className="badge badge-info">Menunggu izin</span>}
+                    <Link href="/panduan-connect" className="btn btn-outline btn-sm">Panduan Connect</Link>
+                  </div>
                 </div>
                 {apiAvailable && docsStatus && !docsStatus.configured && (
-                  <p className="text-sm leading-6 text-base-content/70">Untuk memakai Google Docs, ikuti panduan koneksi di README. Unggah file di bawah bisa langsung digunakan.</p>
+                  <p className="text-sm leading-6 text-base-content/70">Ikuti Panduan Connect untuk menyiapkan akses baca Google Docs. Unggah file di bawah dapat digunakan tanpa koneksi Google.</p>
                 )}
                 {connectionMessage && <p role="status" className="text-sm text-base-content/75">{connectionMessage}</p>}
                 {docsStatus?.configured && !docsStatus.connected && (
@@ -484,15 +487,15 @@ export default function Home() {
 
               <form className="grid gap-4" onSubmit={syncUploadedFile}>
                 <div>
-                  <h3 className="font-semibold">Unggah PDF atau Word</h3>
-                  <p className="mt-1 text-sm leading-6 text-base-content/70">Tanpa setup Google Docs. Gunakan PDF berisi teks atau file Word .docx, maksimal 10 MB.</p>
+                  <h3 className="font-semibold">Unggah Dokumen</h3>
+                  <p className="mt-1 text-sm leading-6 text-base-content/70">Tanpa koneksi Google Docs. Unggah PDF berisi teks, Word .docx, atau Excel .xlsx dengan kolom tanggal dan kegiatan, maksimal 10 MB.</p>
                 </div>
                 <label className="form-control w-full">
                   <span className="label"><span className="label-text font-medium">File logbook</span></span>
                   <input
                     className="file-input file-input-bordered w-full bg-base-100"
                     type="file"
-                    accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    accept=".pdf,.docx,.xlsx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                     onChange={(event) => {
                       setUploadFile(event.target.files?.[0] ?? null);
                       setUploadError("");

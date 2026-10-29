@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from datetime import date, datetime
 from io import BytesIO
 import re
 from zipfile import ZipFile
 
 import pdfplumber
 from docx import Document
+from openpyxl import load_workbook
 
 from app.services.google_docs_parser import (
     ParsedLogbookRow,
@@ -17,6 +19,9 @@ from app.services.google_docs_parser import (
 
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 _MAX_DOCX_UNCOMPRESSED_BYTES = 50 * 1024 * 1024
+_MAX_XLSX_UNCOMPRESSED_BYTES = 50 * 1024 * 1024
+_MAX_XLSX_ROWS = 10_000
+_MAX_XLSX_COLUMNS = 100
 _MAX_PDF_PAGES = 100
 _DATE_START = re.compile(
     r"^\s*(?:(?:senin|selasa|rabu|kamis|jumat|jum'at|sabtu|minggu)\s*,?\s+)?"
@@ -56,8 +61,30 @@ def parse_uploaded_logbook(filename: str, content: bytes) -> list[ParsedLogbookR
             document = Document(BytesIO(content))
             tables = [[[cell.text for cell in row.cells] for row in table.rows] for table in document.tables]
             text = "\n".join(paragraph.text for paragraph in document.paragraphs)
+        elif extension == "xlsx" and content.startswith(b"PK"):
+            with ZipFile(BytesIO(content)) as archive:
+                if "xl/workbook.xml" not in archive.namelist() or sum(
+                    info.file_size for info in archive.infolist()
+                ) > _MAX_XLSX_UNCOMPRESSED_BYTES:
+                    raise FileLogbookError("File Excel tidak valid atau terlalu besar setelah dibuka.")
+            workbook = load_workbook(BytesIO(content), read_only=True, data_only=True)
+            try:
+                tables = []
+                for sheet in workbook.worksheets:
+                    if (sheet.max_row or 0) > _MAX_XLSX_ROWS or (sheet.max_column or 0) > _MAX_XLSX_COLUMNS:
+                        raise FileLogbookError("File Excel melebihi batas 10.000 baris atau 100 kolom per sheet.")
+                    tables.append([
+                        [_cell_text(value) for value in row]
+                        for row in sheet.iter_rows(values_only=True)
+                    ])
+            finally:
+                workbook.close()
+            tables = [table for table in tables if table]
+            text = ""
         else:
-            raise FileLogbookError("Gunakan file PDF atau Word .docx yang valid. Format .doc lama belum didukung.")
+            raise FileLogbookError(
+                "Gunakan file PDF, Word .docx, atau Excel .xlsx yang valid. Format .doc lama belum didukung."
+            )
     except FileLogbookError:
         raise
     except Exception as error:
@@ -68,7 +95,8 @@ def parse_uploaded_logbook(filename: str, content: bytes) -> list[ParsedLogbookR
         rows = _parse_dated_text(text)
     if not rows:
         raise FileLogbookError(
-            "Tidak ada catatan bertanggal yang terbaca. PDF hasil scan memerlukan OCR dan belum didukung."
+            "Tidak ada catatan bertanggal yang terbaca. PDF hasil scan memerlukan OCR, "
+            "sedangkan Excel harus memiliki kolom tanggal dan kegiatan."
         )
     return rows
 
@@ -157,6 +185,14 @@ def _parse_dated_text(text: str) -> list[ParsedLogbookRow]:
     table.extend([[record[key] for key in ("date", "activity", "result", "obstacle", "documentation")]
                   for record in records])
     return _parse_tables([table])
+
+
+def _cell_text(value: object) -> str:
+    if isinstance(value, datetime):
+        return value.date().isoformat()
+    if isinstance(value, date):
+        return value.isoformat()
+    return "" if value is None else str(value).strip()
 
 
 def _cell(value: str) -> dict:

@@ -4,11 +4,11 @@
 
 <h1 align="center">Logpilot: Otomatisasi Logbook Magang UPNVJ</h1>
 
-<p align="center">Otomatisasi pengisian entri harian dari Google Docs, PDF, atau Word ke portal Kampus Berdampak.</p>
+<p align="center">Otomatisasi pengisian entri harian dari Google Docs, PDF, Word, atau Excel ke portal Kampus Berdampak.</p>
 
 <p align="center">
   <a href="#mulai-cepat">Mulai cepat</a> ·
-  <a href="#unggah-pdf-atau-word">Unggah file</a> ·
+  <a href="#unggah-dokumen">Unggah file</a> ·
   <a href="#hubungkan-google-docs">Google Docs</a> ·
   <a href="#aktifkan-groqcloud">GroqCloud</a> ·
   <a href="#pasang-chrome-extension">Chrome extension</a> ·
@@ -22,7 +22,7 @@ Logpilot berjalan di komputer pengguna. Setelah catatan sumber ditinjau dan dise
 ## Yang bisa dilakukan
 
 - Pilih rentang tanggal sesuai kebutuhan, termasuk beberapa hari atau sebagian dari masa magang. Tanggal mulai dan akhir tidak dibatasi contoh dokumen.
-- Baca Google Docs atau unggah PDF dan Word `.docx` tanpa menyiapkan Google Docs API. Lihat tanggal yang terisi, kosong, izin/sakit, perlu dipetakan, atau tidak ditemukan di dokumen.
+- Baca Google Docs atau unggah PDF, Word `.docx`, dan Excel `.xlsx` tanpa menyiapkan Google Docs API. Lihat tanggal yang terisi, kosong, izin/sakit, perlu dipetakan, atau tidak ditemukan di dokumen.
 - Sunting uraian, hasil, kendala, jam kerja format 24 jam, dan tautan dokumentasi sebelum menyetujui entri. Jam serta tautan dokumentasi dapat disimpan sebagai bawaan; nilai per entri tetap bisa diubah.
 - Buat draf hasil harian dan refleksi mingguan dengan GroqCloud, lalu tinjau dan sunting sebelum digunakan. Refleksi Jumat memakai catatan Senin sampai Jumat pada minggu yang sama, walaupun rentang unggah hanya mencakup sebagian minggu.
 - Siapkan batch dari entri yang disetujui. Extension membandingkan entri yang sudah ada di portal, melewati data yang sama, dan memakai form revisi untuk data yang berubah. Hasil Simpan yang tidak dapat dipastikan dihentikan untuk pemeriksaan; entri tersebut tidak dikirim ulang secara otomatis.
@@ -47,7 +47,7 @@ Jika PowerShell menolak skrip, jalankan `Set-ExecutionPolicy -Scope Process Bypa
 
 ### 2. Pilih sumber catatan dan AI
 
-- Untuk cara paling singkat, [unggah PDF atau Word](#unggah-pdf-atau-word) langsung dari dashboard. Tidak perlu proyek Google Cloud.
+- Untuk cara paling singkat, [unggah dokumen](#unggah-dokumen) langsung dari dashboard. Tidak perlu proyek Google Cloud.
 - Jika catatan disimpan di Google Docs, ikuti [panduan koneksi Google Docs](#hubungkan-google-docs).
 - Ikuti [panduan GroqCloud](#aktifkan-groqcloud) jika ingin membuat draf dengan AI. Tanpa API key, entri tetap dapat ditulis manual.
 
@@ -61,13 +61,13 @@ Buka **http://localhost:3000**. Skrip membuka jendela backend dan frontend; hent
 
 Untuk mengisi portal, lanjutkan ke [pemasangan Chrome extension](#pasang-chrome-extension). Login portal tetap dilakukan secara manual.
 
-## Unggah PDF atau Word
+## Unggah Dokumen
 
 1. Di dashboard, pilih tanggal mulai dan akhir, lalu pilih **Terapkan periode**.
-2. Pada **Sumber logbook → Unggah PDF atau Word**, pilih file `.pdf` atau `.docx` maksimal 10 MB dan tekan **Periksa isi file**. Koneksi Google Docs tidak diperlukan.
+2. Pada **Sumber logbook → Unggah Dokumen**, pilih file `.pdf`, `.docx`, atau `.xlsx` maksimal 10 MB dan tekan **Periksa isi file**. Koneksi Google Docs tidak diperlukan.
 3. Periksa tanggal yang dikenali serta uraian kegiatan. Sunting baris yang kurang tepat sebelum menyetujui entri dan menyiapkan batch.
 
-PDF harus berisi teks yang dapat dipilih; PDF hasil scan berupa gambar belum bisa dibaca karena OCR belum tersedia. Word `.docx` didukung, sedangkan format `.doc` lama belum didukung. Parser membaca tabel dengan berbagai nama kolom dan catatan berbasis tanggal tanpa tabel. File asli tidak disimpan; catatan hasil ekstraksi disimpan di database lokal. Jika sumber berubah, entri yang terdampak perlu ditinjau lagi sebelum dipakai.
+PDF harus berisi teks yang dapat dipilih; PDF hasil scan berupa gambar belum bisa dibaca karena OCR belum tersedia. Word `.docx` dan Excel `.xlsx` didukung, sedangkan format Word `.doc` lama belum didukung. Excel harus memiliki kolom tanggal dan kegiatan. Parser membaca tabel dengan berbagai nama kolom dan catatan berbasis tanggal dari PDF/Word. File asli tidak disimpan; catatan hasil ekstraksi disimpan di database lokal. Jika sumber berubah, entri yang terdampak perlu ditinjau lagi sebelum dipakai.
 
 ## Hubungkan Google Docs
 
@@ -159,8 +159,8 @@ Extension hanya mengisi dan menyimpan entri harian yang sudah disetujui. Entri y
 | --- | --- |
 | Dashboard tidak terhubung ke backend | Pastikan jendela backend dari `start.ps1` masih berjalan dan port `8000` tidak dipakai aplikasi lain. |
 | Google menolak akses saat aplikasi masih Testing | Tambahkan akun yang dipilih di **Audience → Test users** pada proyek Google Cloud yang sama. |
-| Dokumen tidak terbaca | Periksa ID/URL Google Docs, akses Viewer akun yang terhubung, dan apakah Google Docs API aktif. |
-| PDF atau Word tidak terbaca | Pastikan file `.pdf` berisi teks atau file Word berformat `.docx`, tidak dilindungi sandi, dan ukurannya paling besar 10 MB. |
+| Sumber Google Docs tidak terbaca | Periksa ID/URL Google Docs, akses Viewer akun yang terhubung, dan apakah Google Docs API aktif. |
+| File tidak terbaca | Pastikan file `.pdf` berisi teks, Word berformat `.docx`, atau Excel berformat `.xlsx` dengan kolom tanggal dan kegiatan. File tidak boleh dilindungi sandi dan ukurannya paling besar 10 MB. |
 | Groq menolak key atau model | Periksa `GROQ_API_KEY` dan `GROQ_MODEL` di `backend/.env`, lalu mulai ulang backend. |
 | Groq membatasi permintaan | Tunggu kuota pulih sesuai [batas penggunaan Groq](https://console.groq.com/docs/rate-limits), lalu buat ulang draf. Entri manual tetap dapat dipakai. |
 | Extension masih memakai perilaku lama | Build ulang, **Reload** extension di Chrome, lalu muat ulang tab portal. |
